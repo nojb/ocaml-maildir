@@ -25,7 +25,11 @@
 (** The type of Maildir folders. *)
 type t
 
-(** Maildir message flags *)
+(** The type of message unique identifiers *)
+type uid =
+  string
+
+(** Message flags *)
 type flag =
   | NEW
   | SEEN
@@ -44,16 +48,35 @@ val create : ?init:bool -> string -> t
 val update : t -> unit
 (** [update md] makes the updates the cached information about the actual contents on-disk. *)
   
-val message_add : t -> string -> string
+val message_add : t -> string -> uid
 (** [message_add md data] adds the message with contents [data].  Returns the
     uid of the newly inserted message. *)
   
-val message_get : t -> string -> string
-(** [message_get md uid] retrieves the message with uid [uid]. *)
+val message_get : t -> uid -> string
+(** [message_get md uid] retrieves the message with uid [uid].
+
+    Raises [Not_found] if no such message is found. *)
   
-val message_remove : t -> string -> unit
-(** [message_remove md uid] removes the message with uid [uid]. *)
+val message_remove : t -> uid -> unit
+(** [message_remove md uid] removes the message with uid [uid].
+
+    Raises [Not_found] if no such message is found. *)
   
-val message_change_flags : t -> string -> flag list -> unit
+val message_change_flags : t -> uid -> flag list -> unit
 (** [message_change_flags md uid flags] changes sets the flags of the message
-    with uid [uid] to [flags]. *)
+    with uid [uid] to [flags].
+
+    Raises [Not_found] if no such message is found. *)
+
+val message_flags : t -> uid -> flag list
+(** [message_flags md uid] returns the list of flags of message with uid [uid].
+    
+    Raises [Not_found] if no such message is found. *)
+
+val message_iter : (uid -> unit) -> t -> unit
+(** [message_iter f md] calls [f] with the uid of each message in [md] in some
+    unspecified order. *)
+
+val message_fold : (uid -> 'a -> 'a) -> t -> 'a -> 'a
+(** [message_fold f md x] computes [(f uid1 (f uid2 (... (f uidN x))))] where
+    [uid1 ... uidN] are the uids of the messages in [md]. *)

@@ -70,11 +70,14 @@ let string_of_flags flags =
       end
   in
   loop None l
-    
+
+type uid =
+  string
+
 type msg = {
-  uid : string;
-  mutable filename : string;
-  mutable flags : flag list
+  uid : uid;
+  filename : string;
+  flags : flag list
 }
 
 type t = {
@@ -100,25 +103,6 @@ let exists path =
 let create_if_needed path =
   if not (exists path) then
     Unix.mkdir path 0o700
-
-let create ?init:(init=false) path =
-  let hostname = Unix.gethostname () in
-  let pid = Unix.getpid () in
-  let counter = 0 in
-  let mtime_new = -1. in
-  let mtime_cur = -1. in
-  let msg_hash = Hashtbl.create default_hash_size in
-  let md =
-    { path; pid; hostname; counter; mtime_new;
-      mtime_cur; msg_hash }
-  in
-  if init then begin
-    create_if_needed path;
-    create_if_needed (Printf.sprintf "%s/tmp" path);
-    create_if_needed (Printf.sprintf "%s/new" path);
-    create_if_needed (Printf.sprintf "%s/cur" path)
-  end;
-  md
 
 let strstr s1 s2 =
   let rec loop i =
@@ -223,6 +207,26 @@ let update md =
     add_directory md path_new true;
     add_directory md path_cur false
   end
+  
+let create ?init:(init=false) path =
+  let hostname = Unix.gethostname () in
+  let pid = Unix.getpid () in
+  let counter = 0 in
+  let mtime_new = -1. in
+  let mtime_cur = -1. in
+  let msg_hash = Hashtbl.create default_hash_size in
+  let md =
+    { path; pid; hostname; counter; mtime_new;
+      mtime_cur; msg_hash }
+  in
+  if init then begin
+    create_if_needed path;
+    create_if_needed (Printf.sprintf "%s/tmp" path);
+    create_if_needed (Printf.sprintf "%s/new" path);
+    create_if_needed (Printf.sprintf "%s/cur" path)
+  end;
+  update md;
+  md
 
 let message_add md message =
   update md;
@@ -263,7 +267,8 @@ let message_remove md uid =
   let filename =
     Printf.sprintf "%s/%s/%s" md.path dir msg.filename
   in
-  Unix.unlink filename
+  Unix.unlink filename;
+  Hashtbl.remove md.msg_hash uid
 
 let message_change_flags md uid new_flags =
   let msg = Hashtbl.find md.msg_hash uid in
@@ -286,7 +291,18 @@ let message_change_flags md uid new_flags =
   if filename <> new_filename then begin
     Unix.link filename new_filename;
     Unix.unlink filename;
-    msg.filename <- Filename.basename new_filename;
-    msg.flags <- new_flags
+    Hashtbl.replace md.msg_hash uid
+      { msg with
+        filename = Filename.basename new_filename;
+        flags = new_flags }
   end
         
+let message_flags md uid =
+  let msg = Hashtbl.find md.msg_hash uid in
+  msg.flags
+
+let message_iter f md =
+  Hashtbl.iter (fun uid _ -> f uid) md.msg_hash
+
+let message_fold f md x =
+  Hashtbl.fold (fun uid _ x -> f uid x) md.msg_hash x
