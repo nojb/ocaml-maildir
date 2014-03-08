@@ -62,7 +62,7 @@ val add : t -> string -> uid
     newly inserted message. *)
   
 val get : t -> uid -> string
-(** [get md uid] retrieves the message with uid [uid].
+(** [get md uid] retrieves the filename of the message with uid [uid].
 
     Raises [Not_found] if no such message is found. *)
   
