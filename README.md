@@ -1,8 +1,7 @@
 # ocaml-maildir
 
 This is a preliminary release of an OCaml library to access directories in the
-[Maildir format](http://www.qmail.org/man/man5/maildir.html).  See also
-http://en.wikipedia.org/wiki/Maildir.
+[Maildir format](http://www.qmail.org/man/man5/maildir.html).
 
 ## Installation
 

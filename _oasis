@@ -1,5 +1,5 @@
 OASISFormat: 0.4
-Name: maildir	
+Name: maildir
 Version: 0.9.0
 Synopsis: Maildir library
 Authors: Nicolas Ojeda Bar
@@ -11,3 +11,25 @@ Library maildir
   Path: lib
   Modules: Maildir
   BuildDepends: unix
+
+Document maildir
+  Title: Maildir docs
+  Type: ocamlbuild (0.4)
+  BuildTools+: ocamldoc
+  Install: true
+  XOCamlbuildPath: lib
+  XOCamlbuildLibraries: maildir
+
+Executable test
+  Path: lib_test
+  MainIs: test.ml
+  Build$: flag(tests)
+  Custom: true
+  CompiledObject: best
+  Install: false
+  BuildDepends: maildir, oUnit (>= 2.0.0)
+
+Test test
+  Run$: flag(tests)
+  Command: $test
+  WorkingDirectory: lib_test
