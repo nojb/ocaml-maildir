@@ -15,7 +15,7 @@ This is a preliminary release of an OCaml library to access directories in the
 2. Configure, build and install (this requires `findlib`)
 
    ```sh
-   cd ocaml-gsasl
+   cd ocaml-maildir
    ./configure
    make
    make install
