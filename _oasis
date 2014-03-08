@@ -1,0 +1,13 @@
+OASISFormat: 0.4
+Name: maildir	
+Version: 0.9.0
+Synopsis: Maildir library
+Authors: Nicolas Ojeda Bar
+License: MIT
+Plugins: META (0.4), DevFiles (0.4)
+BuildTools: ocamlbuild
+            
+Library maildir
+  Path: lib
+  Modules: Maildir
+  BuildDepends: unix

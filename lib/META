@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: 9e2514d1c636164c7a74ebd7015f51b9)
+version = "0.9.0"
+description = "Maildir library"
+requires = "unix"
+archive(byte) = "maildir.cma"
+archive(byte, plugin) = "maildir.cma"
+archive(native) = "maildir.cmxa"
+archive(native, plugin) = "maildir.cmxs"
+exists_if = "maildir.cma"
+# OASIS_STOP
+
