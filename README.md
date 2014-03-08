@@ -55,14 +55,14 @@ that identifies this message. Messages are written to the `tmp` subdir and then
 moved to `new`.
 
     ```ocaml
-    # let uid = Maildir.message_add md "Hello, World!";;
+    # let uid = Maildir.add md "Hello, World!";;
     val uid : string = "1394291867.15508_0.lapc-br1-081.maths.private.cam.ac.uk"
     ```
 
 A newly arrived message only has one flag, `NEW`:
 
     ```ocaml
-    # Maildir.message_flags md uid;;
+    # Maildir.flags md uid;;
     - : Maildir.flag list = [Maildir.NEW]
     ```
 
@@ -84,7 +84,7 @@ If we remove the `NEW` flag, then the message will transparently be moved to the
 `cur` subdir.  It will be moved back if we add the flag back.
 
     ```ocaml
-    # Mail.message_change_flags md uid [Maildir.FLAGGED; Maildir.SEEN];;
+    # Mail.set_flags md uid [Maildir.FLAGGED; Maildir.SEEN];;
     - : unit = ()
     ```
 
@@ -106,7 +106,7 @@ filename now indicates the corresponding flags.
 Finally we remove the message
 
     ```ocaml
-    # Maildir.message_remove md uid;;
+    # Maildir.remove md uid;;
     - : unit = ()
     ```
 
@@ -123,4 +123,4 @@ We can check that the file has disappeared:
 
 ## Comments
 
-Comments, bug reports and feature requests are very welcome: n.oje.bar@gmail.com
+Comments, bug reports and feature requests are very welcome: n.oje.bar@gmail.com.

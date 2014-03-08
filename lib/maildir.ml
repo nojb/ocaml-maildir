@@ -228,7 +228,7 @@ let create ?init:(init=false) path =
   update md;
   md
 
-let message_add md message =
+let add md message =
   update md;
   let tmp_name = get_new_message_filename md in
   let oc = open_out_bin tmp_name in
@@ -252,14 +252,14 @@ let message_add md message =
     begin try Unix.unlink new_name with _ -> () end;
     raise exn
 
-let message_get md uid =
+let get md uid =
   let msg = Hashtbl.find md.msg_hash uid in
   let dir =
     if List.mem NEW msg.flags then "new" else "cur"
   in
   Printf.sprintf "%s/%s/%s" md.path dir msg.filename
 
-let message_remove md uid =
+let remove md uid =
   let msg = Hashtbl.find md.msg_hash uid in
   let dir =
     if List.mem NEW msg.flags then "new" else "cur"
@@ -270,7 +270,7 @@ let message_remove md uid =
   Unix.unlink filename;
   Hashtbl.remove md.msg_hash uid
 
-let message_change_flags md uid new_flags =
+let set_flags md uid new_flags =
   let msg = Hashtbl.find md.msg_hash uid in
   let dir =
     if List.mem NEW msg.flags then "new" else "cur"
@@ -297,12 +297,12 @@ let message_change_flags md uid new_flags =
         flags = new_flags }
   end
         
-let message_flags md uid =
+let flags md uid =
   let msg = Hashtbl.find md.msg_hash uid in
   msg.flags
 
-let message_iter f md =
+let iter f md =
   Hashtbl.iter (fun uid _ -> f uid) md.msg_hash
 
-let message_fold f md x =
+let fold f md x =
   Hashtbl.fold (fun uid _ x -> f uid x) md.msg_hash x
