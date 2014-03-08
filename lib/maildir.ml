@@ -20,6 +20,9 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
 
+let _ =
+  Random.self_init ()
+
 type flag =
   | NEW
   | SEEN
@@ -160,30 +163,17 @@ let add_directory md path is_new =
 let flush md =
   Hashtbl.clear md.msg_hash
 
-let max_try_alloc = 32
-
 let get_new_message_filename md =
   let now = Unix.time () in
-  let rec loop i =
-    if i >= max_try_alloc then raise Not_found
-    else
-      let basename =
-        Printf.sprintf "%.0f.%d_%d.%s" now md.pid md.counter md.hostname
-      in
-      let filename =
-        Printf.sprintf "%s/tmp/%s" md.path basename
-      in
-      try
-        md.counter <- md.counter + 1;
-        ignore (Unix.stat filename);
-        raise Exit
-      with
-      | Unix.Unix_error (Unix.ENOENT, _, _) ->
-        filename
-      | exn ->
-        loop (i+1)
+  let basename =
+    Printf.sprintf "%.0f.R%xP%dQ%d.%s" now (Random.bits ()) md.pid md.counter md.hostname
   in
-  loop 0
+  let filename =
+    Printf.sprintf "%s/tmp/%s" md.path basename
+  in
+  md.counter <- md.counter + 1;
+  assert (not (exists filename));
+  filename
 
 let update md =
   let path_new = Printf.sprintf "%s/new" md.path in
@@ -302,7 +292,7 @@ let flags md uid =
   msg.flags
 
 let iter f md =
-  Hashtbl.iter (fun uid _ -> f uid) md.msg_hash
+  Hashtbl.iter (fun _ msg -> f msg) md.msg_hash
 
 let fold f md x =
-  Hashtbl.fold (fun uid _ x -> f uid x) md.msg_hash x
+  Hashtbl.fold (fun _ msg x -> f msg x) md.msg_hash x

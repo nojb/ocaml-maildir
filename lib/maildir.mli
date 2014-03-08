@@ -39,6 +39,13 @@ type flag =
   | PASSED
   | DRAFT
 
+(** A message *)
+type msg = {
+  uid : uid;
+  filename : string;
+  flags : flag list
+}
+
 val create : ?init:bool -> string -> t
 (** [create init path] returns an object that can be used to access a
     Maildir-directory at [path].  If ?init is [true], then the directory [path]
@@ -46,7 +53,9 @@ val create : ?init:bool -> string -> t
     not exist.  The default is [false]. *)
   
 val update : t -> unit
-(** [update md] makes the updates the cached information about the actual contents on-disk. *)
+(** [update md] updates the cached information to reflect the actual contents of
+    the Maildir folder.  This is only needed if more than one program is
+    accessing the folder. *)
   
 val add : t -> string -> uid
 (** [add md data] adds the message with contents [data].  Returns the uid of the
@@ -73,10 +82,10 @@ val flags : t -> uid -> flag list
 
     Raises [Not_found] if no such message is found. *)
 
-val iter : (uid -> unit) -> t -> unit
-(** [iter f md] calls [f] with the uid of each message in [md] in some
-    unspecified order. *)
+val iter : (msg -> unit) -> t -> unit
+(** [iter f md] computes [f msg1; f msg2; ...; f msgN] where [msg1, ..., msgN]
+    are the messages in [md] (in some unspecified order). *)
 
-val fold : (uid -> 'a -> 'a) -> t -> 'a -> 'a
-(** [fold f md x] computes [(f uid1 (f uid2 (... (f uidN x))))] where [uid1
-    ... uidN] are the uids of the messages in [md]. *)
+val fold : (msg -> 'a -> 'a) -> t -> 'a -> 'a
+(** [fold f md x] computes [(f msg1 (f msg2 (... (f msgN x))))] where [msg1
+    ... msgN] are the messages in [md]. *)
