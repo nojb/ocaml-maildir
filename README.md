@@ -51,7 +51,7 @@ that identifies this message. Messages are written to the `tmp` subdir and then
 moved to `new`.
 ```ocaml
 # let uid = Maildir.add md "Hello, World!";;
-val uid : string = "1394291867.15508_0.lapc-br1-081.maths.private.cam.ac.uk"
+val uid : string = "1394354127.R2ee8b87P28044Q0.lapc-br1-081.maths.private.cam.ac.uk"
 ```
 
 A newly arrived message only has one flag, `NEW`:
@@ -66,7 +66,7 @@ $ ls Maildir/*
 Maildir/cur:
 
 Maildir/new:
-1394291867.15508_0.lapc-br1-081.maths.private.cam.ac.uk
+1394354127.R2ee8b87P28044Q0.lapc-br1-081.maths.private.cam.ac.uk
 
 Maildir/tmp:
 ```
@@ -76,7 +76,7 @@ Maildir/tmp:
 If we remove the `NEW` flag, then the message will transparently be moved to the
 `cur` subdir.  It will be moved back if we add the flag back.
 ```ocaml
-# Mail.set_flags md uid [Maildir.FLAGGED; Maildir.SEEN];;
+# Maildir.set_flags md uid [Maildir.FLAGGED; Maildir.SEEN];;
 - : unit = ()
 ```
 
@@ -85,7 +85,7 @@ filename now indicates the corresponding flags.
 ```sh
 $ ls Maildir/*
 Maildir/cur:
-1394291867.15508_0.lapc-br1-081.maths.private.cam.ac.uk:2,FS
+1394354127.R2ee8b87P28044Q0.lapc-br1-081.maths.private.cam.ac.uk
 
 Maildir/new:
 
