@@ -85,7 +85,7 @@ filename now indicates the corresponding flags.
 ```sh
 $ ls Maildir/*
 Maildir/cur:
-1394354127.R2ee8b87P28044Q0.lapc-br1-081.maths.private.cam.ac.uk
+1394354127.R2ee8b87P28044Q0.lapc-br1-081.maths.private.cam.ac.uk:2,FS
 
 Maildir/new:
 
