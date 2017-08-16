@@ -11,12 +11,10 @@ This is a preliminary release of an OCaml library to access directories in the
    git clone https://github.com/nojb/ocaml-maildir
    ```
 
-2. Configure, build and install (this requires `findlib`)
+2. Configure, build and install
    ```sh
    cd ocaml-maildir
-   ./configure
    make
-   make install
    ```
 
 3. Read the documentation in `lib/maildir.mli`.
