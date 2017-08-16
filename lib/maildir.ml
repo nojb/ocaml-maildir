@@ -1,6 +1,6 @@
 (* The MIT License (MIT)
 
-   Copyright (c) 2014 Nicolas Ojeda Bar <n.oje.bar@gmail.com>
+   Copyright (c) 2014-2017 Nicolas Ojeda Bar <n.oje.bar@gmail.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -197,7 +197,7 @@ let update md =
     add_directory md path_new true;
     add_directory md path_cur false
   end
-  
+
 let create ?init:(init=false) path =
   let hostname = Unix.gethostname () in
   let pid = Unix.getpid () in
@@ -286,7 +286,7 @@ let set_flags md uid new_flags =
         filename = Filename.basename new_filename;
         flags = new_flags }
   end
-        
+
 let flags md uid =
   let msg = Hashtbl.find md.msg_hash uid in
   msg.flags

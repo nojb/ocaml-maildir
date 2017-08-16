@@ -1,6 +1,6 @@
 (* The MIT License (MIT)
 
-   Copyright (c) 2014 Nicolas Ojeda Bar <n.oje.bar@gmail.com>
+   Copyright (c) 2014-2017 Nicolas Ojeda Bar <n.oje.bar@gmail.com>
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -51,26 +51,26 @@ val create : ?init:bool -> string -> t
     Maildir-directory at [path].  If ?init is [true], then the directory [path]
     and its subdirectories "tmp", "cur", and "new" will be created if they do
     not exist.  The default is [false]. *)
-  
+
 val update : t -> unit
 (** [update md] updates the cached information to reflect the actual contents of
     the Maildir folder.  This is only needed if more than one program is
     accessing the folder. *)
-  
+
 val add : t -> string -> uid
 (** [add md data] adds the message with contents [data].  Returns the uid of the
     newly inserted message. *)
-  
+
 val get : t -> uid -> string
 (** [get md uid] retrieves the filename of the message with uid [uid].
 
     Raises [Not_found] if no such message is found. *)
-  
+
 val remove : t -> uid -> unit
 (** [remove md uid] removes the message with uid [uid].
 
     Raises [Not_found] if no such message is found. *)
-  
+
 val set_flags : t -> uid -> flag list -> unit
 (** [set_flags md uid flags] changes sets the flags of the message with uid
     [uid] to [flags].
