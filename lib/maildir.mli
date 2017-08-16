@@ -40,52 +40,55 @@ type flag =
   | DRAFT
 
 (** A message *)
-type msg = {
-  uid : uid;
-  filename : string;
-  flags : flag list
-}
+type msg =
+  {
+    uid: uid;
+    filename: string;
+    flags: flag list;
+  }
 
-val create : ?init:bool -> string -> t
+exception Message_not_found of string
+
+val create: ?init:bool -> string -> t
 (** [create init path] returns an object that can be used to access a
     Maildir-directory at [path].  If ?init is [true], then the directory [path]
     and its subdirectories "tmp", "cur", and "new" will be created if they do
-    not exist.  The default is [false]. *)
+    not exist. The default is [false]. *)
 
-val update : t -> unit
+val update: t -> unit
 (** [update md] updates the cached information to reflect the actual contents of
     the Maildir folder.  This is only needed if more than one program is
     accessing the folder. *)
 
-val add : t -> string -> uid
+val add: t -> string -> uid
 (** [add md data] adds the message with contents [data].  Returns the uid of the
     newly inserted message. *)
 
-val get : t -> uid -> string
+val get: t -> uid -> string
 (** [get md uid] retrieves the filename of the message with uid [uid].
 
-    Raises [Not_found] if no such message is found. *)
+    Raises [Message_not_found uid] if the message is not found. *)
 
-val remove : t -> uid -> unit
+val remove: t -> uid -> unit
 (** [remove md uid] removes the message with uid [uid].
 
-    Raises [Not_found] if no such message is found. *)
+    Raises [Message_not_found uid] if the message is not found. *)
 
-val set_flags : t -> uid -> flag list -> unit
+val set_flags: t -> uid -> flag list -> unit
 (** [set_flags md uid flags] changes sets the flags of the message with uid
     [uid] to [flags].
 
-    Raises [Not_found] if no such message is found. *)
+    Raises [Message_not_found uid] if the message is not found. *)
 
-val flags : t -> uid -> flag list
-(** [flags md uid] returns the list of flags of message with uid [uid].
+val get_flags: t -> uid -> flag list
+(** [fet_flags md uid] returns the list of flags of message with uid [uid].
 
-    Raises [Not_found] if no such message is found. *)
+    Raises [Message_not_found uid] if the message is not found. *)
 
-val iter : (msg -> unit) -> t -> unit
+val iter: (msg -> unit) -> t -> unit
 (** [iter f md] computes [f msg1; f msg2; ...; f msgN] where [msg1, ..., msgN]
     are the messages in [md] (in some unspecified order). *)
 
-val fold : (msg -> 'a -> 'a) -> t -> 'a -> 'a
+val fold: (msg -> 'a -> 'a) -> t -> 'a -> 'a
 (** [fold f md x] computes [(f msg1 (f msg2 (... (f msgN x))))] where [msg1
     ... msgN] are the messages in [md]. *)
