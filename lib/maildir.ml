@@ -200,7 +200,7 @@ let update md =
     add_directory md path_cur false
   end
 
-let create ?(init = false) path =
+let create path =
   let hostname = Unix.gethostname () in
   let pid = Unix.getpid () in
   let counter = 0 in
@@ -208,12 +208,10 @@ let create ?(init = false) path =
   let mtime_cur = -1. in
   let msg_hash = Hashtbl.create default_hash_size in
   let md = {path; pid; hostname; counter; mtime_new; mtime_cur; msg_hash} in
-  if init then begin
-    create_if_needed path;
-    create_if_needed (Printf.sprintf "%s/tmp" path);
-    create_if_needed (Printf.sprintf "%s/new" path);
-    create_if_needed (Printf.sprintf "%s/cur" path)
-  end;
+  create_if_needed path;
+  create_if_needed (Printf.sprintf "%s/tmp" path);
+  create_if_needed (Printf.sprintf "%s/new" path);
+  create_if_needed (Printf.sprintf "%s/cur" path);
   update md;
   md
 

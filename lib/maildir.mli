@@ -49,7 +49,7 @@ type msg =
 
 exception Message_not_found of string
 
-val create: ?init:bool -> string -> t
+val create: string -> t
 (** [create init path] returns an object that can be used to access a
     Maildir-directory at [path].  If ?init is [true], then the directory [path]
     and its subdirectories "tmp", "cur", and "new" will be created if they do
