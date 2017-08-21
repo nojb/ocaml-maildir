@@ -144,10 +144,10 @@ let add_directory m path is_new =
 let flush m =
   Hashtbl.clear m.msg_hash
 
-let get_new_message_filename m =
-  let now = Unix.time () in
+let get_new_message_filename ?(date = Unix.gettimeofday ()) m =
   let basename =
-    Printf.sprintf "%.0f.R%xP%dQ%d.%s" now (Random.bits ()) m.pid m.counter m.hostname
+    Printf.sprintf "%.0f.R%xP%dQ%d.%s" (date *. 1_000_000.)
+      (Random.bits ()) m.pid m.counter m.hostname
   in
   let filename =
     Printf.sprintf "%s/tmp/%s" m.path basename
@@ -157,8 +157,8 @@ let get_new_message_filename m =
   filename
 
 let update m =
-  let path_new = Printf.sprintf "%s/new" m.path in
-  let path_cur = Printf.sprintf "%s/cur" m.path in
+  let path_new = Filename.concat m.path "new" in
+  let path_cur = Filename.concat m.path "cur" in
   let stat_info = Unix.stat path_new in
   let new_changed =
     if stat_info.Unix.st_mtime <> m.mtime_new then
@@ -179,20 +179,30 @@ let update m =
     add_directory m path_cur false
   end
 
+let sanitize s =
+  let b = Buffer.create (String.length s) in
+  for i = 0 to String.length s - 1 do
+    match s.[i] with
+    | '/' -> Buffer.add_string b "\\057"
+    | ':' -> Buffer.add_string b "\\072"
+    | c -> Buffer.add_char b c
+  done;
+  Buffer.contents b
+
 let create path =
-  let hostname = Unix.gethostname () in
+  let hostname = sanitize (Unix.gethostname ()) in
   let pid = Unix.getpid () in
   let counter = 0 in
   let mtime_new = -1. in
   let mtime_cur = -1. in
   let msg_hash = Hashtbl.create default_hash_size in
-  let md = {path; pid; hostname; counter; mtime_new; mtime_cur; msg_hash} in
+  let m = {path; pid; hostname; counter; mtime_new; mtime_cur; msg_hash} in
   create_if_needed path;
-  create_if_needed (Printf.sprintf "%s/tmp" path);
-  create_if_needed (Printf.sprintf "%s/new" path);
-  create_if_needed (Printf.sprintf "%s/cur" path);
-  update md;
-  md
+  create_if_needed (Filename.concat path "tmp");
+  create_if_needed (Filename.concat path "new");
+  create_if_needed (Filename.concat path "cur");
+  update m;
+  m
 
 let with_open_out_bin path f =
   let oc = open_out_bin path in
@@ -204,15 +214,15 @@ let with_open_out_bin path f =
       close_out_noerr oc;
       raise e
 
-let add m message =
+let add m ?date message =
   update m;
-  let tmp_name = get_new_message_filename m in
+  let tmp_name = get_new_message_filename ?date m in
   with_open_out_bin tmp_name (fun oc -> output_string oc message);
   let tmp_basename = Filename.basename tmp_name in
-  let new_name = Printf.sprintf "%s/new/%s" m.path tmp_basename in
+  let new_name = Filename.concat (Filename.concat m.path "new") tmp_basename in
   Unix.link tmp_name new_name;
   Unix.unlink tmp_name;
-  let path_new = Printf.sprintf "%s/new" m.path in
+  let path_new = Filename.concat m.path "new" in
   let stat_info = Unix.stat path_new in
   m.mtime_new <- stat_info.Unix.st_mtime;
   let new_basename = Filename.basename new_name in
@@ -227,21 +237,17 @@ let get m uid =
   match Hashtbl.find m.msg_hash uid with
   | msg ->
       let dir = if List.mem NEW msg.flags then "new" else "cur" in
-      Printf.sprintf "%s/%s/%s" m.path dir msg.filename
+      Filename.concat (Filename.concat m.path dir) msg.filename
   | exception Not_found ->
       raise (Message_not_found uid)
 
-let remove md uid =
-  match Hashtbl.find md.msg_hash uid with
+let remove m uid =
+  match Hashtbl.find m.msg_hash uid with
   | msg ->
-      let dir =
-        if List.mem NEW msg.flags then "new" else "cur"
-      in
-      let filename =
-        Printf.sprintf "%s/%s/%s" md.path dir msg.filename
-      in
+      let dir = if List.mem NEW msg.flags then "new" else "cur" in
+      let filename = Filename.concat (Filename.concat m.path dir) msg.filename in
       Unix.unlink filename;
-      Hashtbl.remove md.msg_hash uid
+      Hashtbl.remove m.msg_hash uid
   | exception Not_found ->
       raise (Message_not_found uid)
 
@@ -249,14 +255,15 @@ let set_flags m uid new_flags =
   match Hashtbl.find m.msg_hash uid with
   | msg ->
       let dir = if List.mem NEW msg.flags then "new" else "cur" in
-      let filename = Printf.sprintf "%s/%s/%s" m.path dir msg.filename in
+      let filename = Filename.concat (Filename.concat m.path dir) msg.filename in
       let dir = if List.mem NEW new_flags then "new" else "cur" in
       let flag_str = string_of_flags new_flags in
       let new_filename =
         if String.length flag_str = 0 then
-          Printf.sprintf "%s/%s/%s" m.path dir msg.uid
+          Filename.concat (Filename.concat m.path dir) msg.uid
         else
-          Printf.sprintf "%s/%s/%s:2,%s" m.path dir msg.uid flag_str
+          Filename.concat (Filename.concat m.path dir)
+            (Printf.sprintf "%s:2,%s" msg.uid flag_str)
       in
       if filename <> new_filename then begin
         Unix.link filename new_filename;

@@ -59,9 +59,10 @@ val update: t -> unit
     the Maildir folder.  This is only needed if more than one program is
     accessing the folder. *)
 
-val add: t -> string -> uid
-(** [add m data] adds the message with contents [data].  Returns the uid of the
-    newly inserted message. *)
+val add: t -> ?date:float -> string -> uid
+(** [add m ?date data] adds the message with contents [data].
+
+    Returns the uid of the newly inserted message. *)
 
 val get: t -> uid -> string
 (** [get m uid] retrieves the filename of the message with uid [uid].

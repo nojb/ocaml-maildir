@@ -11,8 +11,3 @@ lib: [
   "_build/install/default/lib/maildir/maildir.a"
   "_build/install/default/lib/maildir/maildir.cmxs"
 ]
-doc: [
-  "_build/install/default/doc/maildir/README.md"
-  "_build/install/default/doc/maildir/LICENSE.md"
-  "_build/install/default/doc/maildir/CHANGES.md"
-]
