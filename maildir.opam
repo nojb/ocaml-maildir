@@ -1,20 +1,16 @@
 opam-version: "1.2"
 name: "maildir"
-version: "0.9.0"
+version: "0.10.0"
 maintainer: "Nicolas Ojeda Bar <n.oje.bar@gmail.com>"
 authors: "Nicolas Ojeda Bar <n.oje.bar@gmail.com>"
 homepage: "https://github.com/nojb/ocaml-maildir"
+dev-repo: "https://github.com/nojb/ocaml-maildir.git"
+bug-reports: "https://github.com/nojb/ocaml-maildir/issues"
 license: "MIT"
-dev-repo: "git://github.com/nojb/ocaml-maildir"
-build: [
-  ["oasis" "setup"]
-  ["./configure" "--prefix" prefix]
-  [make "build"]
-]
-install: [make "install"]
-remove: [
-  [make "uninstall"]
-  ["ocamlfind" "remove" "maildir"]
-]
 depends: [
+  "jbuilder" {build}
 ]
+build: [
+  ["jbuilder" "build" "-p" name "-j" jobs]
+]
+available: [ocaml-version >= "4.02.3"]

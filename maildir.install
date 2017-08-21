@@ -13,4 +13,6 @@ lib: [
 ]
 doc: [
   "_build/install/default/doc/maildir/README.md"
+  "_build/install/default/doc/maildir/LICENSE.md"
+  "_build/install/default/doc/maildir/CHANGES.md"
 ]
