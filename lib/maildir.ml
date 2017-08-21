@@ -20,7 +20,7 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
 
-let _ =
+let () =
   Random.self_init ()
 
 type flag =
@@ -56,24 +56,10 @@ let string_of_flags flags =
       match char_of_flag f with Some c -> c :: l | None -> l
     ) flags []
   in
-  let l = List.sort compare l in
-  let b = Buffer.create (List.length l) in
-  let rec loop prev l =
-    match prev, l with
-    | _, [] ->
-        Buffer.contents b
-    | None, c :: rest ->
-        Buffer.add_char b c;
-        loop (Some c) rest
-    | Some c, c' :: rest ->
-        if c = c' then
-          loop (Some c) rest
-        else begin
-          Buffer.add_char b c';
-          loop (Some c') rest
-        end
-  in
-  loop None l
+  let l = List.sort_uniq compare l in
+  let b = Bytes.create (List.length l) in
+  List.iteri (fun i c -> Bytes.set b i c) l;
+  Bytes.unsafe_to_string b
 
 type uid =
   string
@@ -100,15 +86,8 @@ exception Message_not_found of string
 
 let default_hash_size = 128
 
-let exists path =
-  match Unix.stat path with
-  | _ ->
-      true
-  | exception Unix.Unix_error (Unix.ENOENT, _, _) ->
-      false
-
 let create_if_needed path =
-  if not (exists path) then Unix.mkdir path 0o700
+  if not (Sys.file_exists path) then Unix.mkdir path 0o700
 
 let strstr s1 s2 =
   let rec loop i =
@@ -135,11 +114,11 @@ let msg_new filename is_new =
   let p = strstr filename ":2," in
   let flags = pflags [] (p+3) in
   let flags = if is_new then NEW :: flags else flags in
-  { uid = String.sub filename 0 p; flags; filename }
+  {uid = String.sub filename 0 p; flags; filename}
 
-let add_message md filename is_new =
+let add_message m filename is_new =
   let msg = msg_new filename is_new in
-  Hashtbl.add md.msg_hash msg.uid msg
+  Hashtbl.add m.msg_hash msg.uid msg
 
 let iter_dir path f =
   let d = Unix.opendir path in
@@ -156,48 +135,48 @@ let iter_dir path f =
   in
   loop ()
 
-let add_directory md path is_new =
+let add_directory m path is_new =
   iter_dir path (fun entry ->
       if entry.[0] <> '.' then
-        try add_message md entry is_new with _ -> ()
+        try add_message m entry is_new with _ -> ()
     )
 
-let flush md =
-  Hashtbl.clear md.msg_hash
+let flush m =
+  Hashtbl.clear m.msg_hash
 
-let get_new_message_filename md =
+let get_new_message_filename m =
   let now = Unix.time () in
   let basename =
-    Printf.sprintf "%.0f.R%xP%dQ%d.%s" now (Random.bits ()) md.pid md.counter md.hostname
+    Printf.sprintf "%.0f.R%xP%dQ%d.%s" now (Random.bits ()) m.pid m.counter m.hostname
   in
   let filename =
-    Printf.sprintf "%s/tmp/%s" md.path basename
+    Printf.sprintf "%s/tmp/%s" m.path basename
   in
-  md.counter <- md.counter + 1;
-  assert (not (exists filename));
+  m.counter <- m.counter + 1;
+  assert (not (Sys.file_exists filename));
   filename
 
-let update md =
-  let path_new = Printf.sprintf "%s/new" md.path in
-  let path_cur = Printf.sprintf "%s/cur" md.path in
+let update m =
+  let path_new = Printf.sprintf "%s/new" m.path in
+  let path_cur = Printf.sprintf "%s/cur" m.path in
   let stat_info = Unix.stat path_new in
   let new_changed =
-    if stat_info.Unix.st_mtime <> md.mtime_new then
-      (md.mtime_new <- stat_info.Unix.st_mtime; true)
+    if stat_info.Unix.st_mtime <> m.mtime_new then
+      (m.mtime_new <- stat_info.Unix.st_mtime; true)
     else
       false
   in
   let stat_info = Unix.stat path_cur in
   let cur_changed =
-    if stat_info.Unix.st_mtime <> md.mtime_cur then
-      (md.mtime_cur <- stat_info.Unix.st_mtime; true)
+    if stat_info.Unix.st_mtime <> m.mtime_cur then
+      (m.mtime_cur <- stat_info.Unix.st_mtime; true)
     else
       false
   in
   if new_changed || cur_changed then begin
-    flush md;
-    add_directory md path_new true;
-    add_directory md path_cur false
+    flush m;
+    add_directory m path_new true;
+    add_directory m path_cur false
   end
 
 let create path =
@@ -215,32 +194,40 @@ let create path =
   update md;
   md
 
-let add md message =
-  update md;
-  let tmp_name = get_new_message_filename md in
-  let oc = open_out_bin tmp_name in
-  output_string oc message;
-  close_out oc;
+let with_open_out_bin path f =
+  let oc = open_out_bin path in
+  match f oc with
+  | r ->
+      close_out oc;
+      r
+  | exception e ->
+      close_out_noerr oc;
+      raise e
+
+let add m message =
+  update m;
+  let tmp_name = get_new_message_filename m in
+  with_open_out_bin tmp_name (fun oc -> output_string oc message);
   let tmp_basename = Filename.basename tmp_name in
-  let new_name = Printf.sprintf "%s/new/%s" md.path tmp_basename in
+  let new_name = Printf.sprintf "%s/new/%s" m.path tmp_basename in
   Unix.link tmp_name new_name;
   Unix.unlink tmp_name;
-  let path_new = Printf.sprintf "%s/new" md.path in
+  let path_new = Printf.sprintf "%s/new" m.path in
   let stat_info = Unix.stat path_new in
-  md.mtime_new <- stat_info.Unix.st_mtime;
+  m.mtime_new <- stat_info.Unix.st_mtime;
   let new_basename = Filename.basename new_name in
-  try
-    add_message md new_basename true;
-    new_basename
-  with e ->
-    begin try Unix.unlink new_name with _ -> () end;
-    raise e
+  match add_message m new_basename true with
+  | () ->
+      new_basename
+  | exception e ->
+      begin try Unix.unlink new_name with _ -> () end;
+      raise e
 
-let get md uid =
-  match Hashtbl.find md.msg_hash uid with
+let get m uid =
+  match Hashtbl.find m.msg_hash uid with
   | msg ->
       let dir = if List.mem NEW msg.flags then "new" else "cur" in
-      Printf.sprintf "%s/%s/%s" md.path dir msg.filename
+      Printf.sprintf "%s/%s/%s" m.path dir msg.filename
   | exception Not_found ->
       raise (Message_not_found uid)
 
@@ -258,29 +245,23 @@ let remove md uid =
   | exception Not_found ->
       raise (Message_not_found uid)
 
-let set_flags md uid new_flags =
-  match Hashtbl.find md.msg_hash uid with
+let set_flags m uid new_flags =
+  match Hashtbl.find m.msg_hash uid with
   | msg ->
-      let dir =
-        if List.mem NEW msg.flags then "new" else "cur"
-      in
-      let filename =
-        Printf.sprintf "%s/%s/%s" md.path dir msg.filename
-      in
-      let dir =
-        if List.mem NEW new_flags then "new" else "cur"
-      in
+      let dir = if List.mem NEW msg.flags then "new" else "cur" in
+      let filename = Printf.sprintf "%s/%s/%s" m.path dir msg.filename in
+      let dir = if List.mem NEW new_flags then "new" else "cur" in
       let flag_str = string_of_flags new_flags in
       let new_filename =
         if String.length flag_str = 0 then
-          Printf.sprintf "%s/%s/%s" md.path dir msg.uid
+          Printf.sprintf "%s/%s/%s" m.path dir msg.uid
         else
-          Printf.sprintf "%s/%s/%s:2,%s" md.path dir msg.uid flag_str
+          Printf.sprintf "%s/%s/%s:2,%s" m.path dir msg.uid flag_str
       in
       if filename <> new_filename then begin
         Unix.link filename new_filename;
         Unix.unlink filename;
-        Hashtbl.replace md.msg_hash uid
+        Hashtbl.replace m.msg_hash uid
           { msg with
             filename = Filename.basename new_filename;
             flags = new_flags }
@@ -288,15 +269,15 @@ let set_flags md uid new_flags =
   | exception Not_found ->
       raise (Message_not_found uid)
 
-let get_flags md uid =
-  match Hashtbl.find md.msg_hash uid with
+let get_flags m uid =
+  match Hashtbl.find m.msg_hash uid with
   | msg ->
       msg.flags
   | exception Not_found ->
       raise (Message_not_found uid)
 
-let iter f md =
-  Hashtbl.iter (fun _ msg -> f msg) md.msg_hash
+let iter f m =
+  Hashtbl.iter (fun _ msg -> f msg) m.msg_hash
 
-let fold f md x =
-  Hashtbl.fold (fun _ msg x -> f msg x) md.msg_hash x
+let fold f m x =
+  Hashtbl.fold (fun _ msg x -> f msg x) m.msg_hash x

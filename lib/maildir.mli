@@ -50,45 +50,44 @@ type msg =
 exception Message_not_found of string
 
 val create: string -> t
-(** [create init path] returns an object that can be used to access a
-    Maildir-directory at [path].  If ?init is [true], then the directory [path]
-    and its subdirectories "tmp", "cur", and "new" will be created if they do
-    not exist. The default is [false]. *)
+(** [create path] returns an object that can be used to access a Maildir
+    directory at [path]. The directory [path] and its subdirectories "tmp",
+    "cur", and "new" will be created if they do not exist. *)
 
 val update: t -> unit
-(** [update md] updates the cached information to reflect the actual contents of
+(** [update m] updates the cached information to reflect the actual contents of
     the Maildir folder.  This is only needed if more than one program is
     accessing the folder. *)
 
 val add: t -> string -> uid
-(** [add md data] adds the message with contents [data].  Returns the uid of the
+(** [add m data] adds the message with contents [data].  Returns the uid of the
     newly inserted message. *)
 
 val get: t -> uid -> string
-(** [get md uid] retrieves the filename of the message with uid [uid].
+(** [get m uid] retrieves the filename of the message with uid [uid].
 
     Raises [Message_not_found uid] if the message is not found. *)
 
 val remove: t -> uid -> unit
-(** [remove md uid] removes the message with uid [uid].
+(** [remove m uid] removes the message with uid [uid].
 
     Raises [Message_not_found uid] if the message is not found. *)
 
 val set_flags: t -> uid -> flag list -> unit
-(** [set_flags md uid flags] changes sets the flags of the message with uid
-    [uid] to [flags].
+(** [set_flags m uid flags] changes sets the flags of the message with uid [uid]
+    to [flags].
 
     Raises [Message_not_found uid] if the message is not found. *)
 
 val get_flags: t -> uid -> flag list
-(** [fet_flags md uid] returns the list of flags of message with uid [uid].
+(** [fet_flags m uid] returns the list of flags of message with uid [uid].
 
     Raises [Message_not_found uid] if the message is not found. *)
 
 val iter: (msg -> unit) -> t -> unit
-(** [iter f md] computes [f msg1; f msg2; ...; f msgN] where [msg1, ..., msgN]
-    are the messages in [md] (in some unspecified order). *)
+(** [iter f m] is [f msg1; f msg2; ...; f msgN] where [msg1, ..., msgN] are the
+    messages in [m] (in some unspecified order). *)
 
 val fold: (msg -> 'a -> 'a) -> t -> 'a -> 'a
-(** [fold f md x] computes [(f msg1 (f msg2 (... (f msgN x))))] where [msg1
-    ... msgN] are the messages in [md]. *)
+(** [fold f m x] is [(f msg1 (f msg2 (... (f msgN x))))] where [msg1 ... msgN]
+    are the messages in [m]. *)
