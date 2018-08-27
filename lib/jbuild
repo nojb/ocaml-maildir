@@ -1,6 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name maildir)
-  (public_name maildir)
-  (libraries (unix))))

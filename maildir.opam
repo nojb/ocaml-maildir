@@ -8,9 +8,9 @@ dev-repo: "https://github.com/nojb/ocaml-maildir.git"
 bug-reports: "https://github.com/nojb/ocaml-maildir/issues"
 license: "MIT"
 depends: [
-  "jbuilder" {build}
+  "dune" {build & >= "1.1.0"}
 ]
 build: [
-  ["jbuilder" "build" "-p" name "-j" jobs]
+  ["dune" "build" "-p" name "-j" jobs]
 ]
 available: [ocaml-version >= "4.02.3"]

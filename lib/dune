@@ -1,0 +1,4 @@
+(library
+  (name maildir)
+  (public_name maildir)
+  (libraries unix))

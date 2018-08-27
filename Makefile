@@ -1,22 +1,24 @@
+DUNE=dune
+
 all:
-	jbuilder build @install
+	$(DUNE) build @install
 
 test:
-	jbuilder runtest
+	$(DUNE) runtest
 
 clean:
-	jbuilder clean
+	$(DUNE) clean
 
 install:
-	jbuilder install
+	$(DUNE) install
 
 uninstall:
-	jbuilder uninstall
+	$(DUNE) uninstall
 
 reinstall: uninstall install
 
 doc:
-	jbuilder build @doc
+	$(DUNE) build @doc
 
 publish-doc: doc
 	rm -rf .gh-pages
