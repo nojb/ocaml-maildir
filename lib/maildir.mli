@@ -25,10 +25,6 @@
 (** The type of Maildir folders. *)
 type t
 
-(** The type of message unique identifiers *)
-type uid =
-  string
-
 (** Message flags *)
 type flag =
   | NEW
@@ -39,56 +35,72 @@ type flag =
   | PASSED
   | DRAFT
 
-(** A message *)
-type msg =
-  {
-    uid: uid;
-    filename: string;
-    flags: flag list;
-  }
+(** The type of message unique identifiers *)
+type uniq =
+  { sequence : int option
+  ; boot : int option
+  ; crypto_random : int option
+  ; inode : int option
+  ; device : int option
+  ; microsecond : int option
+  ; pid : int option
+  ; deliveries : int option }
 
-exception Message_not_found of string
+type uid =
+  | Modern of uniq
+  | Old0 of int
+  | Old1 of int * int
 
-val create: string -> t
-(** [create path] returns an object that can be used to access a Maildir
-    directory at [path]. The directory [path] and its subdirectories "tmp",
-    "cur", and "new" will be created if they do not exist. *)
+type info =
+  | Info of flag list
 
-val update: t -> unit
-(** [update m] updates the cached information to reflect the actual contents of
-    the Maildir folder.  This is only needed if more than one program is
-    accessing the folder. *)
+type message =
+  { time : int
+  ; uid : uid
+  ; info : info
+  ; host : string
+  ; parameters : (string * string) list }
 
-val add: t -> ?date:float -> string -> uid
-(** [add m ?date data] adds the message with contents [data].
+val is_new : message -> bool
+val with_new : message -> message
 
-    Returns the uid of the newly inserted message. *)
+type filename = string
 
-val get: t -> uid -> string
-(** [get m uid] retrieves the filename of the message with uid [uid].
+val to_filename : message -> filename
+val of_filename : filename -> (message, Rresult.R.msg) result
 
-    Raises [Message_not_found uid] if the message is not found. *)
+val create : pid:int -> host:string -> random:(unit -> int) -> Fpath.t -> t
 
-val remove: t -> uid -> unit
-(** [remove m uid] removes the message with uid [uid].
+module type IO = sig
+  type +'a t
 
-    Raises [Message_not_found uid] if the message is not found. *)
+  val bind : 'a t -> ('a -> 'b t) -> 'b t
+  val map : ('a -> 'b) -> 'a t -> 'b t
+  val return : 'a -> 'a t
 
-val set_flags: t -> uid -> flag list -> unit
-(** [set_flags m uid flags] changes sets the flags of the message with uid [uid]
-    to [flags].
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+  val (>>|) : 'a t -> ('a -> 'b) -> 'b t
+end
 
-    Raises [Message_not_found uid] if the message is not found. *)
+module type FS = sig
+  type key
+  type t
 
-val get_flags: t -> uid -> flag list
-(** [fet_flags m uid] returns the list of flags of message with uid [uid].
+  type +'a io
 
-    Raises [Message_not_found uid] if the message is not found. *)
+  val mtime : t -> key -> int64 io
+  val fold : t -> key -> (key -> 'a -> 'a io) -> 'a -> 'a io
+  val rename : t -> key -> key -> unit io
+  val remove : t -> key -> unit io
+  val exists : t -> key -> bool io
+end
 
-val iter: (msg -> unit) -> t -> unit
-(** [iter f m] is [f msg1; f msg2; ...; f msgN] where [msg1, ..., msgN] are the
-    messages in [m] (in some unspecified order). *)
-
-val fold: (msg -> 'a -> 'a) -> t -> 'a -> 'a
-(** [fold f m x] is [(f msg1 (f msg2 (... (f msgN x))))] where [msg1 ... msgN]
-    are the messages in [m]. *)
+module Make (IO : IO) (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t) : sig
+  val add : FS.t -> t -> time:int -> (FS.key -> (unit -> ('a, 'b) result IO.t)) -> ('a, 'b) result IO.t
+  val scan_only_new : ('a -> message -> 'a IO.t) -> 'a -> FS.t -> t -> 'a IO.t
+  val fold : ('a -> message -> 'a IO.t) -> 'a -> FS.t -> t -> 'a IO.t
+  val get : t -> message -> FS.key
+  val remove : FS.t -> t -> message -> unit IO.t
+  val get_flags : FS.t -> t -> message -> flag list IO.t
+  val set_flags : FS.t -> t -> message -> flag list -> unit IO.t
+end
