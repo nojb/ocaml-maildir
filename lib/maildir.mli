@@ -35,7 +35,7 @@ type flag =
   | PASSED
   | DRAFT
 
-(** The type of message unique identifiers *)
+(** The type of message modern-unique identifiers. *)
 type uniq =
   { sequence : int option
   ; boot : int option
@@ -46,11 +46,13 @@ type uniq =
   ; pid : int option
   ; deliveries : int option }
 
+(* The type of message unique identifiers. *)
 type uid =
   | Modern of uniq
   | Old0 of int
   | Old1 of int * int
 
+(** The type of message informations. *)
 type info =
   | Info of flag list
 
@@ -62,14 +64,25 @@ type message =
   ; parameters : (string * string) list }
 
 val is_new : message -> bool
-val with_new : message -> message
+(** [is_new message] returns [true] if [message] has the flag {!NEW}. *)
 
+val with_new : message -> message
+(** [with_new message] returns a new message {i flagged} with {!NEW}. *)
+
+(** Type of filename. *)
 type filename = string
 
 val to_filename : message -> filename
+(** [to_filename message] returns a {!filename} which corresponds to [message]
+    (according to Maildir format). *)
+
 val of_filename : filename -> (message, Rresult.R.msg) result
+(** [of_filename filename] tries to parse [filename] and returns unique message
+   identifier. *)
 
 val create : pid:int -> host:string -> random:(unit -> int) -> Fpath.t -> t
+(** [create ~pid ~host ~random path] returns a witness of Maildir folders at
+    [path]. *)
 
 module type IO = sig
   type +'a t
@@ -96,11 +109,30 @@ module type FS = sig
 end
 
 module Make (IO : IO) (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t) : sig
-  val add : FS.t -> t -> time:int -> (FS.key -> (unit -> ('a, 'b) result IO.t)) -> ('a, 'b) result IO.t
+  type ('a, 'b) transmit = unit -> ('a, 'b) result IO.t
+  (** Type of transmit process. *)
+
+  val add : FS.t -> t -> time:int -> (FS.key -> ('ok, 'err) transmit) -> ('ok, 'err) result IO.t
+  (** [add fs t ~time transmit] adds a new message to Maildir folders [t].
+      [transmit] is the process to transmit contents of message to [tmp] folder.
+      At the end of [transmit] process, [message] is moved to [new] folder as a
+      new message (atomic operation). *)
+
   val scan_only_new : ('a -> message -> 'a IO.t) -> 'a -> FS.t -> t -> 'a IO.t
+  (** [scan_only_new process acc fs t] scans only new messages in [t]. *)
+
   val fold : ('a -> message -> 'a IO.t) -> 'a -> FS.t -> t -> 'a IO.t
+  (** [fold process acc fs t] scans messages [cur]rent and [new] messages in [t]. *)
+
   val get : t -> message -> FS.key
+  (** [get t message] returns location of [message] in [t]. *)
+
   val remove : FS.t -> t -> message -> unit IO.t
+  (** [remove fs t message] removes [message] from [t] and [fs]. *)
+
   val get_flags : FS.t -> t -> message -> flag list IO.t
+  (** [get_flags fs t message] returns flags of [message] available in [t] and [fs]. *)
+
   val set_flags : FS.t -> t -> message -> flag list -> unit IO.t
+  (** [set_flags fs t messages flags] sets flags of [message] in [t] and [fs] to [flags]. *)
 end

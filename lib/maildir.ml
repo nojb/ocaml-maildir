@@ -314,6 +314,8 @@ module Make
     (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t) = struct
   open IO
 
+  type ('a, 'b) transmit = unit -> ('a, 'b) result IO.t
+
   let add fs t ~time transmit =
     let uid = new_message ~time t in
     let message = to_filename uid in
