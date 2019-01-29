@@ -1,0 +1,4 @@
+(library
+  (name maildir_unix)
+  (public_name maildir.unix)
+  (libraries maildir bos unix))

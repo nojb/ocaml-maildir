@@ -109,7 +109,7 @@ module type FS = sig
 end
 
 module Make (IO : IO) (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t) : sig
-  type ('a, 'b) transmit = unit -> ('a, 'b) result IO.t
+  type ('a, 'b) transmit = FS.t -> ('a, 'b) result IO.t
   (** Type of transmit process. *)
 
   val add : FS.t -> t -> time:int -> (FS.key -> ('ok, 'err) transmit) -> ('ok, 'err) result IO.t
