@@ -1,0 +1,4 @@
+(library
+  (name maildir_mem)
+  (public_name maildir.mem)
+  (libraries maildir))
