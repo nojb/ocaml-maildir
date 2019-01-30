@@ -123,7 +123,7 @@ let pp_info ppf = function
   | Info flags -> Fmt.prefix Fmt.(const char ',') pp_flags ppf flags
 
 type message =
-  { time : int
+  { time : int64
   ; uid : uid
   ; info : info
   ; host : string
@@ -148,7 +148,7 @@ let pp_parameter ppf (k, v) =
   Fmt.pf ppf "%s=%s" k v
 
 let pp_message ppf t =
-  Fmt.pf ppf "%d%a%a%a:2,%a"
+  Fmt.pf ppf "%Ld%a%a%a:2,%a"
     t.time pp_uid t.uid pp_host t.host
     Fmt.(iter List.iter (prefix (const char ',') pp_parameter)) t.parameters
     pp_info t.info
@@ -237,7 +237,7 @@ module Parser = struct
       ; (char 'F' *> return FLAGGED) ]
 
   let filename =
-    number >>= fun time ->
+    take_while1 is_digit >>| Int64.of_string >>= fun time ->
     uid >>= fun uid ->
     host >>= fun host ->
     many (char ',' *> parameter) >>= fun parameters ->

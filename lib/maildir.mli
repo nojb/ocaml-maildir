@@ -57,7 +57,7 @@ type info =
   | Info of flag list
 
 type message =
-  { time : int
+  { time : int64
   ; uid : uid
   ; info : info
   ; host : string
@@ -112,7 +112,7 @@ module Make (IO : IO) (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t
   type ('a, 'b) transmit = FS.t -> ('a, 'b) result IO.t
   (** Type of transmit process. *)
 
-  val add : FS.t -> t -> time:int -> (FS.key -> ('ok, 'err) transmit) -> ('ok, 'err) result IO.t
+  val add : FS.t -> t -> time:int64 -> (FS.key -> ('ok, 'err) transmit) -> ('ok, 'err) result IO.t
   (** [add fs t ~time transmit] adds a new message to Maildir folders [t].
       [transmit] is the process to transmit contents of message to [tmp] folder.
       At the end of [transmit] process, [message] is moved to [new] folder as a

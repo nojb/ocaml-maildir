@@ -8,7 +8,7 @@ type ('a, 'b) transmit = fs -> ('a, 'b) result
 val transmit : fs -> Fpath.t -> Fpath.t -> (unit, Rresult.R.msg) result
 (** [transmit a b] creates a process which transmits contents of [a] to [b]. *)
 
-val add : fs -> Maildir.t -> time:int -> (Fpath.t -> ('ok, 'err) transmit) -> ('ok, 'err) result
+val add : fs -> Maildir.t -> time:int64 -> (Fpath.t -> ('ok, 'err) transmit) -> ('ok, 'err) result
 (** [add fs t ~time transmit] adds a new message to Maildir folders [t].
     [transmit] is the process to transmit contents of message to [tmp] folder.
     At the end of [transmit] process, [message] is moved to [new] folder as a
