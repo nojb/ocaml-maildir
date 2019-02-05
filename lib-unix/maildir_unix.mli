@@ -5,6 +5,9 @@ val fs : fs
 type ('a, 'b) transmit = fs -> ('a, 'b) result
 (** Type of transmit process. *)
 
+val verify : fs -> Maildir.t -> bool
+(** [verify fs maildir] verifies that [maildir] is well-formed. *)
+
 val transmit : fs -> Fpath.t -> Fpath.t -> (unit, Rresult.R.msg) result
 (** [transmit a b] creates a process which transmits contents of [a] to [b]. *)
 
