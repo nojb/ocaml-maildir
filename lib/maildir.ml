@@ -20,6 +20,9 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
 
+let src = Logs.Src.create "maildir" ~doc:"logs maildir's event"
+module Log = (val Logs.src_log src : Logs.LOG)
+
 type flag =
   | NEW
   | SEEN
@@ -361,12 +364,16 @@ module Make
         let filename = Fpath.basename path in
         match Parser.of_filename filename with
         | Ok v -> computation acc (with_new v)
-        | Error _ -> return acc in
+        | Error (`Msg err) ->
+            Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+            return acc in
       let computation_cur path acc =
         let filename = Fpath.basename path in
         match Parser.of_filename filename with
         | Ok v -> computation acc v
-        | Error _ -> return acc in
+        | Error (`Msg err) ->
+            Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+            return acc in
       FS.fold fs Fpath.(t.path / "new" / "") computation_new acc >>= fun acc ->
       FS.fold fs Fpath.(t.path / "cur" / "") computation_cur acc >>= fun acc ->
       return acc
@@ -386,12 +393,16 @@ module Make
       let filename = Fpath.basename path in
       match Parser.of_filename filename with
       | Ok v -> computation acc (with_new v)
-      | Error _ -> return acc in
+      | Error (`Msg err) ->
+          Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+          return acc in
     let computation_cur path acc =
       let filename = Fpath.basename path in
       match Parser.of_filename filename with
       | Ok v -> computation acc v
-      | Error _ -> return acc in
+      | Error (`Msg err) ->
+          Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+          return acc in
     FS.fold fs Fpath.(t.path / "new" / "") computation_new acc >>= fun acc ->
     FS.fold fs Fpath.(t.path / "cur" / "") computation_cur acc >>= fun acc ->
     return acc

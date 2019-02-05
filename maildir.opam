@@ -23,5 +23,7 @@ depends: [
   "rresult"
   "fmt"
   "fpath"
+  "bos"
+  "logs"
   "alcotest" {with-test}
 ]

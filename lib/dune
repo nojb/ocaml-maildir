@@ -1,4 +1,4 @@
 (library
   (name maildir)
   (public_name maildir)
-  (libraries angstrom rresult fmt fpath))
+  (libraries angstrom logs rresult fmt fpath))
