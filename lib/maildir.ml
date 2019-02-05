@@ -88,17 +88,18 @@ type 'a uniq_flag =
 type v_uniq_flag = V : 'a uniq_flag -> v_uniq_flag
 
 type uniq =
-  { sequence : int64 option
-  ; boot : int64 option
-  ; crypto_random : int64 option
-  ; inode : int64 option
-  ; device : int64 option
-  ; microsecond : int64 option
-  ; pid : int option
-  ; deliveries : int option
+  { sequence : (int64 * raw) option
+  ; boot : (int64 * raw) option
+  ; crypto_random : (int64 * raw) option
+  ; inode : (int64 * raw) option
+  ; device : (int64 * raw) option
+  ; microsecond : (int64 * raw) option
+  ; pid : (int * raw) option
+  ; deliveries : (int * raw) option
   ; order : v_uniq_flag list }
+and raw = string
 
-let value_of_uniq_flag : type a. a uniq_flag -> uniq -> a option = fun uniq_flag t -> match uniq_flag with
+let value_of_uniq_flag : type a. a uniq_flag -> uniq -> (a * raw) option = fun uniq_flag t -> match uniq_flag with
   | Seq -> t.sequence
   | X -> t.boot
   | R -> t.crypto_random
@@ -108,15 +109,19 @@ let value_of_uniq_flag : type a. a uniq_flag -> uniq -> a option = fun uniq_flag
   | P -> t.pid
   | Q -> t.deliveries
 
-let pp_of_uniq_flag : type a. a uniq_flag -> a Fmt.t = fun uniq_flag ppf v -> match uniq_flag with
-  | Seq -> Fmt.pf ppf "#%Lx" v
-  | X -> Fmt.pf ppf "X%Lx" v
-  | R -> Fmt.pf ppf "R%016Lx" v (* XXX(dinosaure): [016] is not specified. *)
-  | I -> Fmt.pf ppf "I%Lx" v
-  | V -> Fmt.pf ppf "V%Lx" v
-  | M -> Fmt.pf ppf "M%Ld" v
-  | P -> Fmt.pf ppf "P%d" v
-  | Q -> Fmt.pf ppf "Q%d" v
+let pp_of_uniq_flag
+  : type a. a uniq_flag -> (a * raw) Fmt.t
+  = fun uniq_flag ppf v ->
+    let v = snd v in
+    match uniq_flag with
+    | Seq -> Fmt.pf ppf "#%s" v
+    | X -> Fmt.pf ppf "X%s" v
+    | R -> Fmt.pf ppf "R%s" v
+    | I -> Fmt.pf ppf "I%s" v
+    | V -> Fmt.pf ppf "V%s" v
+    | M -> Fmt.pf ppf "M%s" v
+    | P -> Fmt.pf ppf "P%s" v
+    | Q -> Fmt.pf ppf "Q%s" v
 
 let pp_uniq ppf t =
   List.iter (fun (V uniq_flag) -> (Fmt.option (pp_of_uniq_flag uniq_flag)) ppf (value_of_uniq_flag uniq_flag t)) t.order
@@ -207,8 +212,8 @@ module Parser = struct
 
   let is_digit = function '0' .. '9' -> true | _ -> false
   let is_hexadigit = function '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> true | _ -> false
-  let number = take_while1 is_digit >>| Int64.of_string
-  let hexanumber = take_while1 is_hexadigit >>| fun str -> Int64.of_string ("0x" ^ str)
+  let number = take_while1 is_digit >>| fun x -> (Int64.of_string x, x)
+  let hexanumber = take_while1 is_hexadigit >>| fun str -> (Int64.of_string ("0x" ^ str), str)
 
   let sequence = char '#' *> hexanumber
   let boot = char 'X' *> hexanumber
@@ -245,14 +250,14 @@ module Parser = struct
                             ; order = V V :: t.order }
       | `Microsecond x -> { t with microsecond = Some x
                                  ; order = V M :: t.order }
-      | `Pid x -> { t with pid = Some (Int64.to_int x)
+      | `Pid (x, raw) -> { t with pid = Some (Int64.to_int x, raw)
                          ; order = V P :: t.order }
-      | `Deliveries x -> { t with deliveries = Some (Int64.to_int x)
+      | `Deliveries (x, raw) -> { t with deliveries = Some (Int64.to_int x, raw)
                                 ; order = V Q :: t.order })
     default_uniq lst |> fun uniq -> { uniq with order = List.rev uniq.order }
 
-  let old1 = (number >>| Int64.to_int) <* char '_' >>= fun n -> (number >>| Int64.to_int) >>= fun m -> return (n, m)
-  let old0 = (number >>| Int64.to_int)
+  let old1 = (number >>| fst >>| Int64.to_int) <* char '_' >>= fun n -> (number >>| fst >>| Int64.to_int) >>= fun m -> return (n, m)
+  let old0 = (number >>| fst >>| Int64.to_int)
 
   let uid =
     choice
@@ -347,11 +352,12 @@ let create ~pid ~host ~random path =
   ; delivered = 0 }
 
 let new_message ~time t =
+  let random = t.random () in
   let message =
     { time
-    ; uid= Modern { default_uniq with crypto_random= Some (t.random ())
-                                    ; pid= Some t.pid
-                                    ; deliveries= Some t.delivered
+    ; uid= Modern { default_uniq with crypto_random= Some (random, Fmt.strf "%016Lx" random)
+                                    ; pid= Some (t.pid, string_of_int t.pid)
+                                    ; deliveries= Some (t.delivered, string_of_int t.pid)
                                     ; order = [ V R; V P; V Q ] }
     ; host= t.host
     ; info= Info [ NEW ]

@@ -49,15 +49,16 @@ type v_uniq_flag = V : 'a uniq_flag -> v_uniq_flag
 
 (** The type of message modern-unique identifiers. *)
 type uniq =
-  { sequence : int64 option
-  ; boot : int64 option
-  ; crypto_random : int64 option
-  ; inode : int64 option
-  ; device : int64 option
-  ; microsecond : int64 option
-  ; pid : int option
-  ; deliveries : int option
+  { sequence : (int64 * raw) option
+  ; boot : (int64 * raw) option
+  ; crypto_random : (int64 * raw) option
+  ; inode : (int64 * raw) option
+  ; device : (int64 * raw) option
+  ; microsecond : (int64 * raw) option
+  ; pid : (int * raw) option
+  ; deliveries : (int * raw) option
   ; order : v_uniq_flag list }
+and raw = string
 
 (* The type of message unique identifiers. *)
 type uid =
