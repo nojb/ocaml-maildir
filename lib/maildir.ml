@@ -20,7 +20,11 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
 
-let () = Printexc.record_backtrace true
+module Option = struct
+  let map f = function
+    | Some x -> Some (f x)
+    | None -> None
+end
 
 let src = Logs.Src.create "maildir" ~doc:"logs maildir's event"
 module Log = (val Logs.src_log src : Logs.LOG)
@@ -78,18 +82,18 @@ let canonicalize_flags flags =
 let pp_flags = Fmt.using string_of_flags Fmt.string
 
 type uniq =
-  { sequence : int option
-  ; boot : int option
-  ; crypto_random : int option
-  ; inode : int option
-  ; device : int option
-  ; microsecond : int option
+  { sequence : int64 option
+  ; boot : int64 option
+  ; crypto_random : int64 option
+  ; inode : int64 option
+  ; device : int64 option
+  ; microsecond : int64 option
   ; pid : int option
   ; deliveries : int option }
 
 let pp_uniq ppf t =
-  let using_dec key = Fmt.using (function None -> "" | Some v -> Fmt.strf "%c%d" key v) Fmt.string in
-  let using_hex key = Fmt.using (function None -> "" | Some v -> Fmt.strf "%c%x" key v) Fmt.string in
+  let using_dec key = Fmt.using (function None -> "" | Some v -> Fmt.strf "%c%Ld" key v) Fmt.string in
+  let using_hex key = Fmt.using (function None -> "" | Some v -> Fmt.strf "%c%Lx" key v) Fmt.string in
   Fmt.pf ppf "%a%a%a%a%a%a%a%a" (* lol *)
     (using_hex '#') t.sequence
     (using_hex 'X') t.boot
@@ -97,8 +101,8 @@ let pp_uniq ppf t =
     (using_hex 'I') t.inode
     (using_hex 'V') t.device
     (using_dec 'M') t.microsecond
-    (using_dec 'P') t.pid
-    (using_dec 'Q') t.deliveries
+    (using_dec 'P') (Option.map Int64.of_int t.pid)
+    (using_dec 'Q') (Option.map Int64.of_int t.deliveries)
 
 let default_uniq =
   { sequence = None
@@ -185,8 +189,8 @@ module Parser = struct
 
   let is_digit = function '0' .. '9' -> true | _ -> false
   let is_hexadigit = function '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> true | _ -> false
-  let number = take_while1 is_digit >>| int_of_string
-  let hexanumber = take_while1 is_hexadigit >>| fun str -> Fmt.epr "FAIL ON %s.\n%!" str ; int_of_string ("0x" ^ str)
+  let number = take_while1 is_digit >>| Int64.of_string
+  let hexanumber = take_while1 is_hexadigit >>| fun str -> Int64.of_string ("0x" ^ str)
 
   let sequence = char '#' *> hexanumber
   let boot = char 'X' *> hexanumber
@@ -217,12 +221,12 @@ module Parser = struct
       | `Inode x -> { t with inode = Some x }
       | `Device x -> { t with device = Some x }
       | `Microsecond x -> { t with microsecond = Some x }
-      | `Pid x -> { t with pid = Some x }
-      | `Deliveries x -> { t with deliveries = Some x })
+      | `Pid x -> { t with pid = Some (Int64.to_int x) }
+      | `Deliveries x -> { t with deliveries = Some (Int64.to_int x) })
     default_uniq lst
 
-  let old1 = number <* char '_' >>= fun n -> number >>= fun m -> return (n, m)
-  let old0 = number
+  let old1 = (number >>| Int64.to_int) <* char '_' >>= fun n -> (number >>| Int64.to_int) >>= fun m -> return (n, m)
+  let old0 = (number >>| Int64.to_int)
 
   let uid =
     choice
@@ -284,7 +288,7 @@ type t =
   { pid : int
   ; host : string
   ; path : Fpath.t
-  ; random : unit -> int
+  ; random : unit -> int64
   ; mutable mtime_new : int64
   ; mutable mtime_cur : int64
   ; mutable delivered : int }

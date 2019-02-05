@@ -30,7 +30,7 @@ let maildir =
   Maildir.create
     ~pid:(Unix.getpid ())
     ~host:(Unix.gethostname ())
-    ~random:(fun () -> Random.int 1000)
+    ~random:(Int64.of_int <.> Random.bits)
     Store.root
 
 let populate store =

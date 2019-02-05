@@ -37,12 +37,12 @@ type flag =
 
 (** The type of message modern-unique identifiers. *)
 type uniq =
-  { sequence : int option
-  ; boot : int option
-  ; crypto_random : int option
-  ; inode : int option
-  ; device : int option
-  ; microsecond : int option
+  { sequence : int64 option
+  ; boot : int64 option
+  ; crypto_random : int64 option
+  ; inode : int64 option
+  ; device : int64 option
+  ; microsecond : int64 option
   ; pid : int option
   ; deliveries : int option }
 
@@ -87,7 +87,7 @@ val of_filename : filename -> (message, Rresult.R.msg) result
 (** [of_filename filename] tries to parse [filename] and returns unique message
    identifier. *)
 
-val create : pid:int -> host:string -> random:(unit -> int) -> Fpath.t -> t
+val create : pid:int -> host:string -> random:(unit -> int64) -> Fpath.t -> t
 (** [create ~pid ~host ~random path] returns a witness of Maildir folders at
     [path]. *)
 
