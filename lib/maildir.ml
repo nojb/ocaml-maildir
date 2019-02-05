@@ -20,6 +20,8 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
 
+let () = Printexc.record_backtrace true
+
 let src = Logs.Src.create "maildir" ~doc:"logs maildir's event"
 module Log = (val Logs.src_log src : Logs.LOG)
 
