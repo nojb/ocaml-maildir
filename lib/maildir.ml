@@ -111,7 +111,7 @@ let value_of_uniq_flag : type a. a uniq_flag -> uniq -> a option = fun uniq_flag
 let pp_of_uniq_flag : type a. a uniq_flag -> a Fmt.t = fun uniq_flag ppf v -> match uniq_flag with
   | Seq -> Fmt.pf ppf "#%Lx" v
   | X -> Fmt.pf ppf "X%Lx" v
-  | R -> Fmt.pf ppf "R%Lx" v
+  | R -> Fmt.pf ppf "R%016Lx" v (* XXX(dinosaure): [016] is not specified. *)
   | I -> Fmt.pf ppf "I%Lx" v
   | V -> Fmt.pf ppf "V%Lx" v
   | M -> Fmt.pf ppf "M%Ld" v
