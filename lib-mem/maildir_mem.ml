@@ -11,10 +11,16 @@ end
 
 module FS = struct
   type key = Fpath.t
-  type elt = { mutable mtime : int64; contents : string; }
+  type elt = { mutable mtime : int64; contents : [ `Directory | `Contents of string ]; }
   type t = (key, elt) Hashtbl.t
 
   type +'a io = 'a IO.t
+
+  let gettime =
+    let idx = ref (-1L) in
+    fun () -> idx := Int64.succ !idx ; !idx
+
+  let root = Fpath.v "/"
 
   let mtime fs path =
     match Hashtbl.find fs path with
@@ -24,15 +30,25 @@ module FS = struct
   let fold fs path computation acc =
     Hashtbl.fold
       (fun k _ a ->
-         if Fpath.(equal (base k) path)
-         then computation path a
+         if Fpath.(equal (parent k) path)
+         then computation k a
          else a)
       fs acc
 
   let rename fs a b =
     match Hashtbl.find fs a with
     | v ->
-      Hashtbl.remove fs a ; Hashtbl.add fs b v
+        let mtime = gettime () in
+        let rec update path = match Fpath.is_root path with
+          | true -> ()
+          | false ->
+              let value = Hashtbl.find fs path in
+              value.mtime <- mtime ;
+              update (Fpath.parent path) in
+        update (Fpath.parent a) ;
+        update (Fpath.parent b) ;
+        Hashtbl.remove fs a ;
+        Hashtbl.add fs b v
     | exception Not_found -> Fmt.invalid_arg "%a not found" Fpath.pp a
 
   let remove fs path = Hashtbl.remove fs path
@@ -46,6 +62,8 @@ module Maildir = Maildir.Make (IO) (FS)
 type fs = FS.t
 
 let fs length : fs = Hashtbl.create length
+let root = FS.root
+let gettime = FS.gettime
 
 let transmit fs a b =
   match Hashtbl.find fs a with

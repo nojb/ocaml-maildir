@@ -119,8 +119,8 @@ type info =
   | Info of flag list
 
 let pp_info ppf = function
-  | Info [] -> Fmt.nop ppf ()
-  | Info flags -> Fmt.prefix Fmt.(const char ',') pp_flags ppf flags
+  | Info [] | Info [ NEW ] -> Fmt.nop ppf ()
+  | Info flags -> pp_flags ppf flags
 
 type message =
   { time : int64
@@ -160,8 +160,8 @@ let to_filename = Fmt.to_to_string pp_message
 let with_new message =
   let Info flags = message.info in
   if List.exists (function NEW -> true | _ -> false) flags
-  then { message with info = Info (NEW :: flags) }
-  else message
+  then message
+  else { message with info = Info (NEW :: flags) }
 
 module Parser = struct
   open Angstrom
@@ -244,13 +244,13 @@ module Parser = struct
     char ':' *> peek_char >>= function
       (* TODO: | Some '1' -> _ *)
     | Some '2' ->
-        char ',' *> many flag >>| fun flags -> { time; uid; host; parameters; info = Info flags }
+        char '2' *> char ',' *> many flag >>| fun flags -> { time; uid; host; parameters; info = Info flags }
     | _ -> return { time; uid; host; parameters; info = Info [] }
 
   let of_filename input =
     match parse_string filename input with
     | Ok v -> Ok v
-    | Error _ -> Rresult.R.error_msgf "Invalid filename: %s" input
+    | Error err -> Rresult.R.error_msgf "Invalid filename: %s (%s)" input err
 end
 
 let of_filename = Parser.of_filename
@@ -263,6 +263,12 @@ type t =
   ; mutable mtime_new : int64
   ; mutable mtime_cur : int64
   ; mutable delivered : int }
+
+let to_fpath t message =
+  let result = to_filename message in
+  if is_new message
+  then Fpath.(t.path / "new" / result)
+  else Fpath.(t.path / "cur" / result)
 
 let create ~pid ~host ~random path =
   { pid
@@ -316,6 +322,12 @@ module Make
 
   type ('a, 'b) transmit = FS.t -> ('a, 'b) result IO.t
 
+  let verify fs t =
+    FS.exists fs Fpath.(t.path / "cur" / "") >>= fun cur_ ->
+    FS.exists fs Fpath.(t.path / "tmp" / "") >>= fun tmp_ ->
+    FS.exists fs Fpath.(t.path / "new" / "") >>= fun new_ ->
+    return (cur_ && tmp_ && new_)
+
   let add fs t ~time transmit =
     let uid = new_message ~time t in
     let message = to_filename uid in
@@ -324,19 +336,21 @@ module Make
     | Ok v ->
         let o = Fpath.(t.path / "tmp" / message) in
         let n = Fpath.(t.path / "new" / message) in
-        FS.rename fs o n >>= fun () -> return (Ok v)
+        FS.rename fs o n >>= fun () ->
+        return (Ok v)
     | Error _ as err -> return err
 
   let scan_only_new computation acc fs t =
-    FS.mtime fs Fpath.(t.path / "new")
+    FS.mtime fs Fpath.(t.path / "new" / "")
     >>= fun mtime_new ->
-    (if mtime_new <> t.mtime_new
+    (if mtime_new > t.mtime_new
      then ( t.mtime_new <- mtime_new
           ; return true )
      else return false)
     >>= fun new_changed ->
-    FS.mtime fs Fpath.(t.path / "cur") >>= fun mtime_cur ->
-    (if mtime_cur <> t.mtime_cur
+    FS.mtime fs Fpath.(t.path / "cur" / "")
+    >>= fun mtime_cur ->
+    (if mtime_cur > t.mtime_cur
      then ( t.mtime_cur <- mtime_cur
           ; return true )
      else return false)
@@ -353,10 +367,19 @@ module Make
         match Parser.of_filename filename with
         | Ok v -> computation acc v
         | Error _ -> return acc in
-      FS.fold fs Fpath.(t.path / "new") computation_new acc >>= fun acc ->
-      FS.fold fs Fpath.(t.path / "cur") computation_cur acc >>= fun acc ->
+      FS.fold fs Fpath.(t.path / "new" / "") computation_new acc >>= fun acc ->
+      FS.fold fs Fpath.(t.path / "cur" / "") computation_cur acc >>= fun acc ->
       return acc
     else return acc
+
+  let commit fs t message =
+    if is_new message
+    then
+      let m = to_filename message in
+      let a = Fpath.(t.path / "new" / m) in
+      let b = Fpath.(t.path / "cur" / m) in
+      FS.rename fs a b
+    else return ()
 
   let fold computation acc fs t =
     let computation_new path acc =
@@ -369,8 +392,8 @@ module Make
       match Parser.of_filename filename with
       | Ok v -> computation acc v
       | Error _ -> return acc in
-    FS.fold fs Fpath.(t.path / "new") computation_new acc >>= fun acc ->
-    FS.fold fs Fpath.(t.path / "cur") computation_cur acc >>= fun acc ->
+    FS.fold fs Fpath.(t.path / "new" / "") computation_new acc >>= fun acc ->
+    FS.fold fs Fpath.(t.path / "cur" / "") computation_cur acc >>= fun acc ->
     return acc
 
   let get t uid =

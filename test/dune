@@ -1,0 +1,8 @@
+(executable
+ (name test_mem)
+ (libraries maildir maildir.mem alcotest))
+
+(alias
+ (name runtest)
+ (deps (:test_mem test_mem.exe))
+ (action (run %{test_mem} --color=always)))

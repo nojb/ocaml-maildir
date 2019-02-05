@@ -63,6 +63,9 @@ type message =
   ; host : string
   ; parameters : (string * string) list }
 
+val pp_message : message Fmt.t
+(** Prettry-printer of {!message}. *)
+
 val is_new : message -> bool
 (** [is_new message] returns [true] if [message] has the flag {!NEW}. *)
 
@@ -74,6 +77,10 @@ type filename = string
 
 val to_filename : message -> filename
 (** [to_filename message] returns a {!filename} which corresponds to [message]
+    (according to Maildir format). *)
+
+val to_fpath : t -> message -> Fpath.t
+(** [to_fpath] returns a [Fpath.t] which corresponds to [message]
     (according to Maildir format). *)
 
 val of_filename : filename -> (message, Rresult.R.msg) result
@@ -112,6 +119,8 @@ module Make (IO : IO) (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t
   type ('a, 'b) transmit = FS.t -> ('a, 'b) result IO.t
   (** Type of transmit process. *)
 
+  val verify : FS.t -> t -> bool IO.t
+
   val add : FS.t -> t -> time:int64 -> (FS.key -> ('ok, 'err) transmit) -> ('ok, 'err) result IO.t
   (** [add fs t ~time transmit] adds a new message to Maildir folders [t].
       [transmit] is the process to transmit contents of message to [tmp] folder.
@@ -126,6 +135,9 @@ module Make (IO : IO) (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t
 
   val get : t -> message -> FS.key
   (** [get t message] returns location of [message] in [t]. *)
+
+  val commit : FS.t -> t -> message -> unit IO.t
+  (** [commit fs t message] commits new [message] to "cur" directory. *)
 
   val remove : FS.t -> t -> message -> unit IO.t
   (** [remove fs t message] removes [message] from [t] and [fs]. *)
