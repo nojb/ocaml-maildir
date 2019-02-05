@@ -45,7 +45,7 @@ module FS : Maildir.FS
           Fpath.pp path err
 
   let exists () path =
-    match Bos.OS.File.exists path with
+    match Bos.OS.Path.exists path with
     | Ok v -> v
     | Error (`Msg err) ->
         Fmt.epr "Retrieve an error when we want to access to %a: %s.\n%!"
