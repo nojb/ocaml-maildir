@@ -94,7 +94,7 @@ let commit_new_message store =
       Store.commit fs maildir message ;
       let news = Store.fold only_new [] fs maildir in
       if List.length news <> 0
-      then Alcotest.failf "Commit fails."
+      then Alcotest.failf "Commit fails, new messages: %a." (Fmt.Dump.list Maildir.pp_message) news
       else ()
   | news -> Alcotest.failf "Too much news messages (%d new messages): @[<hov>%a@]"
               (List.length news)
@@ -149,4 +149,3 @@ let () =
       ; test_add_some 2
       ; test_commit_some 1
       ; test_commit_some 1 ] ]
-    

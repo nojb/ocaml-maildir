@@ -151,10 +151,16 @@ let pp_parameter ppf (k, v) =
   Fmt.pf ppf "%s=%s" k v
 
 let pp_message ppf t =
-  Fmt.pf ppf "%Ld%a%a%a:2,%a"
-    t.time pp_uid t.uid pp_host t.host
-    Fmt.(iter List.iter (prefix (const char ',') pp_parameter)) t.parameters
-    pp_info t.info
+  if is_new t
+  then
+    Fmt.pf ppf "%Ld.%a.%a%a"
+      t.time pp_uid t.uid pp_host t.host
+      Fmt.(iter List.iter (prefix (const char ',') pp_parameter)) t.parameters
+  else
+    Fmt.pf ppf "%Ld.%a.%a%a:2,%a"
+      t.time pp_uid t.uid pp_host t.host
+      Fmt.(iter List.iter (prefix (const char ',') pp_parameter)) t.parameters
+      pp_info t.info
 
 type filename = string
 
@@ -165,6 +171,12 @@ let with_new message =
   if List.exists (function NEW -> true | _ -> false) flags
   then message
   else { message with info = Info (NEW :: flags) }
+
+let without_new ?(flags = []) message =
+  let Info flags' = message.info in
+  let flags = List.merge compare_flag flags flags' in
+  let flags = List.filter (function NEW -> false | _ -> true) flags in
+  { message with info = Info flags }
 
 module Parser = struct
   open Angstrom
@@ -239,16 +251,24 @@ module Parser = struct
       ; (char 'D' *> return DRAFT)
       ; (char 'F' *> return FLAGGED) ]
 
+  let failf fmt = Fmt.kstrf fail fmt
+
   let filename =
     take_while1 is_digit >>| Int64.of_string >>= fun time ->
-    uid >>= fun uid ->
-    host >>= fun host ->
+    char '.' *> uid >>= fun uid ->
+    char '.' *> host >>= fun host ->
     many (char ',' *> parameter) >>= fun parameters ->
-    char ':' *> peek_char >>= function
-      (* TODO: | Some '1' -> _ *)
-    | Some '2' ->
-        char '2' *> char ',' *> many flag >>| fun flags -> { time; uid; host; parameters; info = Info flags }
-    | _ -> return { time; uid; host; parameters; info = Info [] }
+    peek_char >>= function
+    | None ->
+        return { time; uid; host; parameters; info = Info [ NEW ] }
+    | Some ':' ->
+        (char ':' *> peek_char >>= function
+          (* TODO: | Some '1' -> _ *)
+          | Some '2' ->
+              char '2' *> char ',' *> many flag >>| fun flags -> { time; uid; host; parameters; info = Info flags }
+          | None -> failf "Expect more input"
+          | Some chr -> failf "Invalid character: %02x" (Char.code chr))
+    | Some chr -> failf "Invalid character: %02x" (Char.code chr)
 
   let of_filename input =
     match parse_string filename input with
@@ -379,12 +399,17 @@ module Make
       return acc
     else return acc
 
-  let commit fs t message =
+  let commit fs t ?(flags = []) message =
+    if List.exists (function NEW -> true | _ -> false) flags
+    then Fmt.invalid_arg "Impossible to apply NEW flag on a committed message." ;
+
     if is_new message
     then
+      let message' = without_new ~flags message in
       let m = to_filename message in
+      let m' = to_filename message' in
       let a = Fpath.(t.path / "new" / m) in
-      let b = Fpath.(t.path / "cur" / m) in
+      let b = Fpath.(t.path / "cur" / m') in
       FS.rename fs a b
     else return ()
 

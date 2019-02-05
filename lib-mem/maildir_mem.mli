@@ -39,7 +39,7 @@ val get : Maildir.t -> Maildir.message -> Fpath.t
 val remove : fs -> Maildir.t -> Maildir.message -> unit
 (** [remove fs t message] removes [message] from [t] and [fs]. *)
 
-val commit : fs -> Maildir.t -> Maildir.message -> unit
+val commit : fs -> Maildir.t -> ?flags:Maildir.flag list -> Maildir.message -> unit
 
 val get_flags : fs -> Maildir.t -> Maildir.message -> Maildir.flag list
 (** [get_flags fs t message] returns flags of [message] available in [t] and [fs]. *)

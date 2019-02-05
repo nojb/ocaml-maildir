@@ -136,7 +136,8 @@ module Make (IO : IO) (FS : FS with type +'a io = 'a IO.t and type key = Fpath.t
   val get : t -> message -> FS.key
   (** [get t message] returns location of [message] in [t]. *)
 
-  val commit : FS.t -> t -> message -> unit IO.t  (** [commit fs t message] commits new [message] to "cur" directory. *)
+  val commit : FS.t -> t -> ?flags:flag list -> message -> unit IO.t
+  (** [commit fs t message] commits new [message] to "cur" directory. *)
 
   val remove : FS.t -> t -> message -> unit IO.t
   (** [remove fs t message] removes [message] from [t] and [fs]. *)
