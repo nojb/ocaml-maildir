@@ -238,11 +238,23 @@ module Parser = struct
     take_while1 (function ':' -> false | _ -> true)
     >>| fun str ->
     let len = String.length str in
-    let str = Bytes.unsafe_of_string str in
-    for i = 0 to len - 1
-    do if Bytes.unsafe_get str i = '\057' then Bytes.unsafe_set str i '/' ;
-       if Bytes.unsafe_get str i = '\072' then Bytes.unsafe_set str i ':' done ;
-    Bytes.unsafe_to_string str
+    let res = Buffer.create len in
+    let idx = ref 0 in
+    let has_backslash = ref false in
+
+    while !idx < len
+    do
+      if !has_backslash && (!idx - len) >= 3
+      then match String.sub str !idx 3 with
+        | "057" -> Buffer.add_char res '/' ; has_backslash := false ; idx := !idx + 3
+        | "072" -> Buffer.add_char res ':' ; has_backslash := false ; idx := !idx + 3
+        | _ -> Buffer.add_char res str.[!idx] ; has_backslash := str.[!idx] = '\\' ; incr idx
+      else ( Buffer.add_char res str.[!idx] ;
+             has_backslash := str.[!idx] = '\\' ;
+             incr idx )
+    done ;
+
+    Buffer.contents res
 
   let parameter =
     take_while1 (function '=' | ':' | ',' -> false | _ -> true) <* char '=' >>= fun key ->
