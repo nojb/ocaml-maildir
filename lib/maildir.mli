@@ -35,6 +35,18 @@ type flag =
   | PASSED
   | DRAFT
 
+type 'a uniq_flag =
+  | Seq : int64 uniq_flag
+  | X : int64 uniq_flag
+  | R : int64 uniq_flag
+  | I : int64 uniq_flag
+  | V : int64 uniq_flag
+  | M : int64 uniq_flag
+  | P : int uniq_flag
+  | Q : int uniq_flag
+
+type v_uniq_flag = V : 'a uniq_flag -> v_uniq_flag
+
 (** The type of message modern-unique identifiers. *)
 type uniq =
   { sequence : int64 option
@@ -44,7 +56,8 @@ type uniq =
   ; device : int64 option
   ; microsecond : int64 option
   ; pid : int option
-  ; deliveries : int option }
+  ; deliveries : int option
+  ; order : v_uniq_flag list }
 
 (* The type of message unique identifiers. *)
 type uid =

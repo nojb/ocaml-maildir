@@ -20,12 +20,6 @@
    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
    SOFTWARE. *)
 
-module Option = struct
-  let map f = function
-    | Some x -> Some (f x)
-    | None -> None
-end
-
 let src = Logs.Src.create "maildir" ~doc:"logs maildir's event"
 module Log = (val Logs.src_log src : Logs.LOG)
 
@@ -81,6 +75,18 @@ let canonicalize_flags flags =
 
 let pp_flags = Fmt.using string_of_flags Fmt.string
 
+type 'a uniq_flag =
+  | Seq : int64 uniq_flag
+  | X : int64 uniq_flag
+  | R : int64 uniq_flag
+  | I : int64 uniq_flag
+  | V : int64 uniq_flag
+  | M : int64 uniq_flag
+  | P : int uniq_flag
+  | Q : int uniq_flag
+
+type v_uniq_flag = V : 'a uniq_flag -> v_uniq_flag
+
 type uniq =
   { sequence : int64 option
   ; boot : int64 option
@@ -89,20 +95,31 @@ type uniq =
   ; device : int64 option
   ; microsecond : int64 option
   ; pid : int option
-  ; deliveries : int option }
+  ; deliveries : int option
+  ; order : v_uniq_flag list }
+
+let value_of_uniq_flag : type a. a uniq_flag -> uniq -> a option = fun uniq_flag t -> match uniq_flag with
+  | Seq -> t.sequence
+  | X -> t.boot
+  | R -> t.crypto_random
+  | I -> t.inode
+  | V -> t.device
+  | M -> t.microsecond
+  | P -> t.pid
+  | Q -> t.deliveries
+
+let pp_of_uniq_flag : type a. a uniq_flag -> a Fmt.t = fun uniq_flag ppf v -> match uniq_flag with
+  | Seq -> Fmt.pf ppf "#%Lx" v
+  | X -> Fmt.pf ppf "X%Lx" v
+  | R -> Fmt.pf ppf "R%Lx" v
+  | I -> Fmt.pf ppf "I%Lx" v
+  | V -> Fmt.pf ppf "V%Lx" v
+  | M -> Fmt.pf ppf "M%Ld" v
+  | P -> Fmt.pf ppf "P%d" v
+  | Q -> Fmt.pf ppf "Q%d" v
 
 let pp_uniq ppf t =
-  let using_dec key = Fmt.using (function None -> "" | Some v -> Fmt.strf "%c%Ld" key v) Fmt.string in
-  let using_hex key = Fmt.using (function None -> "" | Some v -> Fmt.strf "%c%Lx" key v) Fmt.string in
-  Fmt.pf ppf "%a%a%a%a%a%a%a%a" (* lol *)
-    (using_hex '#') t.sequence
-    (using_hex 'X') t.boot
-    (using_hex 'R') t.crypto_random
-    (using_hex 'I') t.inode
-    (using_hex 'V') t.device
-    (using_dec 'M') t.microsecond
-    (using_dec 'P') (Option.map Int64.of_int t.pid)
-    (using_dec 'Q') (Option.map Int64.of_int t.deliveries)
+  List.iter (fun (V uniq_flag) -> (Fmt.option (pp_of_uniq_flag uniq_flag)) ppf (value_of_uniq_flag uniq_flag t)) t.order
 
 let default_uniq =
   { sequence = None
@@ -112,7 +129,8 @@ let default_uniq =
   ; device = None
   ; microsecond = None
   ; pid = None
-  ; deliveries = None }
+  ; deliveries = None
+  ; order = [] }
 
 type uid =
   | Modern of uniq
@@ -215,15 +233,23 @@ module Parser = struct
   let modern =
     many1 modern >>| fun lst -> List.fold_left
     (fun t -> function
-      | `Sequence x -> { t with sequence = Some x }
-      | `Boot x -> { t with boot = Some x }
-      | `Crypto_random x -> { t with crypto_random = Some x }
-      | `Inode x -> { t with inode = Some x }
-      | `Device x -> { t with device = Some x }
-      | `Microsecond x -> { t with microsecond = Some x }
-      | `Pid x -> { t with pid = Some (Int64.to_int x) }
-      | `Deliveries x -> { t with deliveries = Some (Int64.to_int x) })
-    default_uniq lst
+      | `Sequence x -> { t with sequence = Some x
+                              ; order = V Seq :: t.order }
+      | `Boot x -> { t with boot = Some x
+                          ; order = V X :: t.order }
+      | `Crypto_random x -> { t with crypto_random = Some x
+                                   ; order = V R :: t.order }
+      | `Inode x -> { t with inode = Some x
+                           ; order = V I :: t.order }
+      | `Device x -> { t with device = Some x
+                            ; order = V V :: t.order }
+      | `Microsecond x -> { t with microsecond = Some x
+                                 ; order = V M :: t.order }
+      | `Pid x -> { t with pid = Some (Int64.to_int x)
+                         ; order = V P :: t.order }
+      | `Deliveries x -> { t with deliveries = Some (Int64.to_int x)
+                                ; order = V Q :: t.order })
+    default_uniq lst |> fun uniq -> { uniq with order = List.rev uniq.order }
 
   let old1 = (number >>| Int64.to_int) <* char '_' >>= fun n -> (number >>| Int64.to_int) >>= fun m -> return (n, m)
   let old0 = (number >>| Int64.to_int)
@@ -325,7 +351,8 @@ let new_message ~time t =
     { time
     ; uid= Modern { default_uniq with crypto_random= Some (t.random ())
                                     ; pid= Some t.pid
-                                    ; deliveries= Some t.delivered }
+                                    ; deliveries= Some t.delivered
+                                    ; order = [ V R; V P; V Q ] }
     ; host= t.host
     ; info= Info [ NEW ]
     ; parameters= [] } in
