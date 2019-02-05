@@ -186,7 +186,7 @@ module Parser = struct
   let is_digit = function '0' .. '9' -> true | _ -> false
   let is_hexadigit = function '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> true | _ -> false
   let number = take_while1 is_digit >>| int_of_string
-  let hexanumber = take_while1 is_hexadigit >>| fun str -> int_of_string ("0x" ^ str)
+  let hexanumber = take_while1 is_hexadigit >>| fun str -> Fmt.epr "FAIL ON %s.\n%!" str ; int_of_string ("0x" ^ str)
 
   let sequence = char '#' *> hexanumber
   let boot = char 'X' *> hexanumber
