@@ -365,14 +365,14 @@ module Make
         match Parser.of_filename filename with
         | Ok v -> computation acc (with_new v)
         | Error (`Msg err) ->
-            Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+            Log.warn (fun m -> m "%s" err) ;
             return acc in
       let computation_cur path acc =
         let filename = Fpath.basename path in
         match Parser.of_filename filename with
         | Ok v -> computation acc v
         | Error (`Msg err) ->
-            Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+            Log.warn (fun m -> m "%s" err) ;
             return acc in
       FS.fold fs Fpath.(t.path / "new" / "") computation_new acc >>= fun acc ->
       FS.fold fs Fpath.(t.path / "cur" / "") computation_cur acc >>= fun acc ->
@@ -394,14 +394,14 @@ module Make
       match Parser.of_filename filename with
       | Ok v -> computation acc (with_new v)
       | Error (`Msg err) ->
-          Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+          Log.warn (fun m -> m "%s" err) ;
           return acc in
     let computation_cur path acc =
       let filename = Fpath.basename path in
       match Parser.of_filename filename with
       | Ok v -> computation acc v
       | Error (`Msg err) ->
-          Log.warn (fun m -> m "Invalid filename (%s): %s. Silently ignore it." filename err) ;
+          Log.warn (fun m -> m "%s" err) ;
           return acc in
     FS.fold fs Fpath.(t.path / "new" / "") computation_new acc >>= fun acc ->
     FS.fold fs Fpath.(t.path / "cur" / "") computation_cur acc >>= fun acc ->
