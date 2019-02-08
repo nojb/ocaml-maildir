@@ -66,9 +66,15 @@ type uid =
   | Old0 of int
   | Old1 of int * int
 
+val pp_uid : uid Fmt.t
+(** Pretty-printer of {!uid}. *)
+
 (** The type of message informations. *)
 type info =
   | Info of flag list
+
+val pp_info : info Fmt.t
+(** Pretty-printer of {!info}. *)
 
 type message =
   { time : int64
@@ -79,6 +85,13 @@ type message =
 
 val pp_message : message Fmt.t
 (** Prettry-printer of {!message}. *)
+
+val equal_uniq : uniq -> uniq -> bool
+val equal_flag : flag -> flag -> bool
+val equal_info : info -> info -> bool
+val equal_uid : uid -> uid -> bool
+val equal_parameters : (string * string) list -> (string * string) list -> bool
+val equal_message : message -> message -> bool
 
 val is_new : message -> bool
 (** [is_new message] returns [true] if [message] has the flag {!NEW}. *)

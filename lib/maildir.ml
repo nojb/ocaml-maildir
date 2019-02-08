@@ -23,6 +23,15 @@
 let src = Logs.Src.create "maildir" ~doc:"logs maildir's event"
 module Log = (val Logs.src_log src : Logs.LOG)
 
+module Option = struct
+  let map f = function Some x -> Some (f x) | None -> None
+
+  let equal ~eq a b = match a, b with
+    | Some a, Some b -> eq a b
+    | None, None -> true
+    | _, _ -> false
+end
+
 type flag =
   | NEW
   | SEEN
@@ -48,6 +57,8 @@ let compare_flag a b = match a, b with
   | PASSED, _ -> 1
   | DRAFT, _ -> 1
 
+let equal_flag a b = compare_flag a b = 0
+
 let char_of_flag = function
   | SEEN -> Some 'S'
   | REPLIED -> Some 'R'
@@ -60,20 +71,19 @@ let char_of_flag = function
 let string_of_flags flags =
   let l =
     List.fold_right (fun f l ->
-      match char_of_flag f with Some c -> c :: l | None -> l
-    ) flags []
+        match char_of_flag f with Some c -> c :: l | None -> l)
+      flags []
   in
   let l = List.sort_uniq compare l in
   let b = Bytes.create (List.length l) in
   List.iteri (fun i c -> Bytes.set b i c) l;
   Bytes.unsafe_to_string b
 
-let canonicalize_flags flags =
-  let module Set = Set.Make(struct type t = flag let compare = compare_flag end) in
-  let set = List.fold_right Set.add flags Set.empty in
-  Set.elements set
+let canonicalize_flags flags = List.sort_uniq compare flags
 
 let pp_flags = Fmt.using string_of_flags Fmt.string
+
+let equal_flags a b = String.equal (string_of_flags a) (string_of_flags b)
 
 type 'a uniq_flag =
   | Seq : int64 uniq_flag
@@ -98,6 +108,27 @@ type uniq =
   ; deliveries : (int * raw) option
   ; order : v_uniq_flag list }
 and raw = string
+
+external id : 'a -> 'a = "%identity"
+
+let equal_uniq a b =
+  let sequence      = Option.equal ~eq:String.equal (Option.map snd a.sequence) (Option.map snd b.sequence) in
+  let boot          = Option.equal ~eq:String.equal (Option.map snd a.boot) (Option.map snd b.boot) in
+  let crypto_random = Option.equal ~eq:String.equal (Option.map snd a.crypto_random) (Option.map snd b.crypto_random) in
+  let inode         = Option.equal ~eq:String.equal (Option.map snd a.inode) (Option.map snd b.inode) in
+  let device        = Option.equal ~eq:String.equal (Option.map snd a.device) (Option.map snd b.device) in
+  let microsecond   = Option.equal ~eq:String.equal (Option.map snd a.microsecond) (Option.map snd b.microsecond) in
+  let pid           = Option.equal ~eq:String.equal (Option.map snd a.pid) (Option.map snd b.pid) in
+  let deliveries    = Option.equal ~eq:String.equal (Option.map snd a.deliveries) (Option.map snd b.deliveries) in
+  List.for_all id
+    [ sequence
+    ; boot
+    ; crypto_random
+    ; inode
+    ; device
+    ; microsecond
+    ; pid
+    ; deliveries ]
 
 let value_of_uniq_flag : type a. a uniq_flag -> uniq -> (a * raw) option = fun uniq_flag t -> match uniq_flag with
   | Seq -> t.sequence
@@ -142,6 +173,14 @@ type uid =
   | Old0 of int
   | Old1 of int * int
 
+let equal_uid a b = match a, b with
+  | Modern a, Modern b -> equal_uniq a b
+  | Old0 a, Old0 b -> (compare : int -> int -> int) a b = 0
+  | Old1 (aa, ab), Old1 (ba, bb) ->
+      (compare : int -> int -> int) aa ba = 0
+      && (compare : int -> int -> int) ab bb = 0
+  | _, _ -> false
+
 let pp_uid ppf = function
   | Modern uniq -> Fmt.pf ppf "%a" pp_uniq uniq
   | Old0 n -> Fmt.int ppf n
@@ -150,9 +189,12 @@ let pp_uid ppf = function
 type info =
   | Info of flag list
 
+let equal_info (Info a) (Info b) = equal_flags a b
+
 let pp_info ppf = function
-  | Info [] | Info [ NEW ] -> Fmt.nop ppf ()
-  | Info flags -> pp_flags ppf flags
+  | Info [] | Info [ NEW ] -> ()
+  | Info flags ->
+      Fmt.(prefix (const string ":2,") pp_flags) ppf flags
 
 type message =
   { time : int64
@@ -160,6 +202,19 @@ type message =
   ; info : info
   ; host : string
   ; parameters : (string * string) list }
+
+let equal_parameters a b =
+  try List.for_all2 (fun (k0, v0) (k1, v1) -> String.equal k0 k1 && String.equal v0 v1)
+        (List.sort (fun (a, _) (b, _) -> String.compare a b) a)
+        (List.sort (fun (a, _) (b, _) -> String.compare a b) b)
+  with _ -> false
+
+let equal_message a b =
+  Int64.equal a.time b.time
+  && equal_uid a.uid b.uid
+  && equal_info a.info b.info
+  && String.equal a.host b.host
+  && equal_parameters a.parameters b.parameters
 
 let is_new { info = Info flags; _ } = List.exists ((=) NEW) flags
 
@@ -180,15 +235,9 @@ let pp_parameter ppf (k, v) =
   Fmt.pf ppf "%s=%s" k v
 
 let pp_message ppf t =
-  if is_new t
-  then
-    Fmt.pf ppf "%Ld.%a.%a%a"
+    Fmt.pf ppf "%Ld.%a.%a%a%a"
       t.time pp_uid t.uid pp_host t.host
-      Fmt.(iter List.iter (prefix (const char ',') pp_parameter)) t.parameters
-  else
-    Fmt.pf ppf "%Ld.%a.%a%a:2,%a"
-      t.time pp_uid t.uid pp_host t.host
-      Fmt.(iter List.iter (prefix (const char ',') pp_parameter)) t.parameters
+      Fmt.(iter ~sep:Fmt.nop List.iter (prefix (const char ',') pp_parameter)) t.parameters
       pp_info t.info
 
 type filename = string
@@ -238,22 +287,30 @@ module Parser = struct
   let modern =
     many1 modern >>| fun lst -> List.fold_left
     (fun t -> function
-      | `Sequence x -> { t with sequence = Some x
-                              ; order = V Seq :: t.order }
-      | `Boot x -> { t with boot = Some x
-                          ; order = V X :: t.order }
-      | `Crypto_random x -> { t with crypto_random = Some x
-                                   ; order = V R :: t.order }
-      | `Inode x -> { t with inode = Some x
-                           ; order = V I :: t.order }
-      | `Device x -> { t with device = Some x
-                            ; order = V V :: t.order }
-      | `Microsecond x -> { t with microsecond = Some x
-                                 ; order = V M :: t.order }
-      | `Pid (x, raw) -> { t with pid = Some (Int64.to_int x, raw)
-                         ; order = V P :: t.order }
-      | `Deliveries (x, raw) -> { t with deliveries = Some (Int64.to_int x, raw)
-                                ; order = V Q :: t.order })
+      | `Sequence x ->
+          { t with sequence = Some x
+                 ; order = V Seq :: t.order }
+      | `Boot x ->
+          { t with boot = Some x
+                 ; order = V X :: t.order }
+      | `Crypto_random x ->
+          { t with crypto_random = Some x
+                 ; order = V R :: t.order }
+      | `Inode x ->
+          { t with inode = Some x
+                 ; order = V I :: t.order }
+      | `Device x ->
+          { t with device = Some x
+                 ; order = V V :: t.order }
+      | `Microsecond x ->
+          { t with microsecond = Some x
+                 ; order = V M :: t.order }
+      | `Pid (x, raw) ->
+          { t with pid = Some (Int64.to_int x, raw)
+                 ; order = V P :: t.order }
+      | `Deliveries (x, raw) ->
+          { t with deliveries = Some (Int64.to_int x, raw)
+                 ; order = V Q :: t.order })
     default_uniq lst |> fun uniq -> { uniq with order = List.rev uniq.order }
 
   let old1 = (number >>| fst >>| Int64.to_int) <* char '_' >>= fun n -> (number >>| fst >>| Int64.to_int) >>= fun m -> return (n, m)
@@ -266,7 +323,7 @@ module Parser = struct
       ; (old0 >>| fun x -> Old0 x) ]
 
   let host =
-    take_while1 (function ':' -> false | _ -> true)
+    take_while1 (function ':' | ',' (* NOTE: [,] comes from Dovecot. *) -> false | _ -> true)
     >>| fun str ->
     let len = String.length str in
     let res = Buffer.create len in
@@ -275,16 +332,29 @@ module Parser = struct
 
     while !idx < len
     do
-      if !has_backslash && (!idx - len) >= 3
-      then match String.sub str !idx 3 with
-        | "057" -> Buffer.add_char res '/' ; has_backslash := false ; idx := !idx + 3
-        | "072" -> Buffer.add_char res ':' ; has_backslash := false ; idx := !idx + 3
-        | _ -> Buffer.add_char res str.[!idx] ; has_backslash := str.[!idx] = '\\' ; incr idx
-      else ( Buffer.add_char res str.[!idx] ;
-             has_backslash := str.[!idx] = '\\' ;
+      if !has_backslash && (len - !idx) >= 3
+      then
+        match String.sub str !idx 3 with
+        | "057" ->
+            Buffer.add_char res '/' ; has_backslash := false ; idx := !idx + 3
+        | "072" ->
+            Buffer.add_char res ':' ; has_backslash := false ; idx := !idx + 3
+        | _ ->
+            Buffer.add_char res '\\' ;
+            has_backslash := false ;
+            if str.[!idx] = '\\'
+            then has_backslash := true
+            else Buffer.add_char res str.[!idx] ;
+            incr idx
+      else ( if !has_backslash then Buffer.add_char res '\\' ;
+             has_backslash := false ;
+             if str.[!idx] <> '\\'
+             then Buffer.add_char res str.[!idx]
+             else has_backslash := true ;
              incr idx )
     done ;
 
+    if !has_backslash then Buffer.add_char res '\\' ;
     Buffer.contents res
 
   let parameter =
