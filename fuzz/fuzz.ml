@@ -51,6 +51,9 @@ let order = fun (seq, x, r, i, v, m, p, q) ->
     :: (Option.map (fun _ -> Maildir.(V Q)) q)
     :: [] in
   let flags = List.fold_left (fun a -> function Some x -> x :: a | None -> a) [] flags in
+
+  if List.length flags = 0 then bad_test () ;
+
   let choose = Crowbar.choose (List.map (fun flag -> Crowbar.const flag) flags) in
   Crowbar.map [ list1 choose ] @@ fun order ->
   let order, _ =
